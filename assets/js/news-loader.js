@@ -1,43 +1,74 @@
-// News Loader - Loads news from admin panel to latestnews.html
+// News Loader - Loads news from Supabase to latestnews.html
 (function() {
+    let cachedNews = [];
+    let lastNewsFetch = 0;
+    const NEWS_CACHE_DURATION = 10000; // 10 seconds cache
+    
+    // Function to fetch news from Supabase
+    async function fetchNewsFromSupabase() {
+        try {
+            if (!window.supabase) {
+                return [];
+            }
+            
+            const { data: news, error } = await window.supabase
+                .from('news')
+                .select('*')
+                .order('date', { ascending: false });
+            
+            if (error) throw error;
+            
+            return news || [];
+        } catch (error) {
+            console.error('Error loading news from Supabase:', error);
+            return [];
+        }
+    }
+    
+    // Function to force refresh news
+    async function refreshNews() {
+        console.log('🔄 Refreshing news from Supabase');
+        cachedNews = [];
+        lastNewsFetch = 0;
+        await loadAdminNews();
+    }
+    
     // Listen for real-time updates
     window.addEventListener('admin-content-updated', function(e) {
         if (e.detail && e.detail.type === 'news') {
             console.log('🔄 Reloading news due to admin update');
-            loadAdminNews();
-        }
-    });
-    
-    window.addEventListener('admin-data-updated', function(e) {
-        if (e.detail && e.detail.key === 'admin-news') {
-            console.log('🔄 Reloading news due to data update');
-            loadAdminNews();
+            refreshNews();
         }
     });
     
     window.addEventListener('storage', function(e) {
-        if (e.key === 'admin-news') {
+        if (e.key === 'news-updated') {
             console.log('🔄 Reloading news due to storage change');
-            loadAdminNews();
+            refreshNews();
         }
     });
     
-    function loadAdminNews() {
+    async function loadAdminNews() {
         const newsContainer = document.getElementById('latest-news-container');
         if (!newsContainer) return;
         
-        const news = JSON.parse(localStorage.getItem('admin-news') || '[]');
+        // Always fetch fresh if cache is older than 10 seconds
+        const now = Date.now();
+        if (now - lastNewsFetch > NEWS_CACHE_DURATION || cachedNews.length === 0) {
+            console.log('Fetching fresh news from Supabase');
+            cachedNews = await fetchNewsFromSupabase();
+            lastNewsFetch = now;
+        }
         
-        // Sort by date (newest first)
-        const sortedNews = news.sort((a, b) => new Date(b.date) - new Date(a.date));
+        const news = cachedNews;
         
-        if (sortedNews.length === 0) {
+        if (news.length === 0) {
             newsContainer.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 3rem;">No news articles available at this time. Check back later!</p>';
             return;
         }
         
-        newsContainer.innerHTML = sortedNews.map(item => {
-            const newsDate = new Date(item.date);
+        newsContainer.innerHTML = news.map(item => {
+            const newsDate = item.date ? new Date(item.date) : new Date();
             const formattedDate = newsDate.toLocaleDateString('en-US', { 
                 year: 'numeric', 
                 month: 'long', 
@@ -59,7 +90,7 @@
                         <span><i class="fas fa-tag" aria-hidden="true"></i> ${item.source || 'Admin'}</span>
                     </div>
                     <div style="color: var(--text-secondary); line-height: 1.7; margin-bottom: 1rem;">
-                        ${item.content.split('\n').map(p => `<p>${p}</p>`).join('')}
+                        ${item.content ? item.content.split('\n').map(p => `<p>${p}</p>`).join('') : ''}
                     </div>
                     ${item.link ? `
                         <a href="${item.link}" target="_blank" rel="noopener" style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--primary-blue); text-decoration: none; font-weight: 600;">
@@ -71,17 +102,17 @@
         }).join('');
     }
     
+    // Poll for updates every 15 seconds (fallback)
+    setInterval(function() {
+        if (document.visibilityState === 'visible') {
+            refreshNews();
+        }
+    }, 15000);
+    
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', loadAdminNews);
     } else {
         loadAdminNews();
     }
-    
-    window.addEventListener('storage', loadAdminNews);
-    window.addEventListener('admin-content-updated', (e) => {
-        if (e.detail.type === 'news') {
-            loadAdminNews();
-        }
-    });
 })();
 

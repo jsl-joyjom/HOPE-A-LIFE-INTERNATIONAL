@@ -3013,152 +3013,295 @@ window.addEventListener('event-registration-added', () => {
 });
 
 // News Management
-function loadNews(searchTerm = '', pendingSearchTerm = '') {
-    const news = JSON.parse(localStorage.getItem('admin-news') || '[]');
-    const pendingNews = JSON.parse(localStorage.getItem('pending-news') || '[]');
-    
-    const publishedList = document.getElementById('news-list');
-    const pendingList = document.getElementById('pending-news-list');
-    
-    // Filter published news if search term provided
-    let filteredNews = news;
-    if (searchTerm.trim()) {
-        const searchLower = searchTerm.toLowerCase();
-        filteredNews = news.filter(item => 
-            (item.title && item.title.toLowerCase().includes(searchLower)) ||
-            (item.content && item.content.toLowerCase().includes(searchLower)) ||
-            (item.source && item.source.toLowerCase().includes(searchLower)) ||
-            (item.author && item.author.toLowerCase().includes(searchLower))
-        );
-    }
-    
-    // Filter pending news if search term provided
-    let filteredPendingNews = pendingNews;
-    if (pendingSearchTerm.trim()) {
-        const searchLower = pendingSearchTerm.toLowerCase();
-        filteredPendingNews = pendingNews.filter(item => 
-            (item.title && item.title.toLowerCase().includes(searchLower)) ||
-            (item.content && item.content.toLowerCase().includes(searchLower)) ||
-            (item.source && item.source.toLowerCase().includes(searchLower)) ||
-            (item.author && item.author.toLowerCase().includes(searchLower))
-        );
-    }
-    
-    if (filteredNews.length === 0) {
-        publishedList.innerHTML = searchTerm.trim()
-            ? `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No news articles found matching "${searchTerm}"</p>`
-            : '<p>No news articles published yet.</p>';
-    } else {
-        publishedList.innerHTML = filteredNews.map((item, displayIndex) => {
-            // Find original index for delete function
-            const originalIndex = news.findIndex(n => n.id === item.id);
-            return `
-            <div class="item-card">
-                <div class="item-card-content">
-                    <h3>${item.title}</h3>
-                    <p><strong>Source:</strong> ${item.source} | <strong>Date:</strong> ${new Date(item.date).toLocaleDateString()}</p>
-                    <p>${item.content.substring(0, 150)}...</p>
-                    ${item.link ? `<p><a href="${item.link}" target="_blank">Read more →</a></p>` : ''}
-                </div>
-                <div class="item-card-actions">
-                    <button class="btn btn-danger" onclick="deleteNews(${originalIndex})">
-                        <i class="fas fa-trash"></i> Delete
-                    </button>
-                </div>
-            </div>
-        `;
-        }).join('');
-    }
-    
-    if (filteredPendingNews.length === 0) {
-        pendingList.innerHTML = pendingSearchTerm.trim()
-            ? `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No pending news found matching "${pendingSearchTerm}"</p>`
-            : '<p>No pending news submissions.</p>';
-    } else {
-        pendingList.innerHTML = filteredPendingNews.map((item, displayIndex) => {
-            // Find original index for approve/reject functions
-            const originalIndex = pendingNews.findIndex(n => n.id === item.id);
-            return `
-            <div class="item-card">
-                <div class="item-card-content">
-                    <h3>${item.title}</h3>
-                    <p><strong>Submitted:</strong> ${new Date(item.submittedAt).toLocaleDateString()}</p>
-                    <p>${item.content.substring(0, 150)}...</p>
-                </div>
-                <div class="item-card-actions">
-                    <button class="btn btn-primary" onclick="approveNews(${originalIndex})">
-                        <i class="fas fa-check"></i> Approve
-                    </button>
-                    <button class="btn btn-danger" onclick="rejectNews(${originalIndex})">
-                        <i class="fas fa-times"></i> Reject
-                    </button>
-                </div>
-            </div>
-        `;
-        }).join('');
+async function loadNews(searchTerm = '', pendingSearchTerm = '') {
+    try {
+        if (!window.supabase) {
+            const publishedList = document.getElementById('news-list');
+            const pendingList = document.getElementById('pending-news-list');
+            if (publishedList) publishedList.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Database connection not available. Please refresh the page.</p>';
+            if (pendingList) pendingList.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Database connection not available. Please refresh the page.</p>';
+            return;
+        }
+
+        // Fetch published news from Supabase
+        const { data: news, error: newsError } = await window.supabase
+            .from('news')
+            .select('*')
+            .order('date', { ascending: false });
+        
+        if (newsError) throw newsError;
+        
+        // Fetch pending news from Supabase
+        const { data: pendingNews, error: pendingError } = await window.supabase
+            .from('pending_news')
+            .select('*')
+            .order('submitted_at', { ascending: false });
+        
+        if (pendingError) throw pendingError;
+        
+        const publishedList = document.getElementById('news-list');
+        const pendingList = document.getElementById('pending-news-list');
+        
+        const allNews = news || [];
+        const allPendingNews = pendingNews || [];
+        
+        // Filter published news if search term provided
+        let filteredNews = allNews;
+        if (searchTerm.trim()) {
+            const searchLower = searchTerm.toLowerCase();
+            filteredNews = allNews.filter(item => 
+                (item.title && item.title.toLowerCase().includes(searchLower)) ||
+                (item.content && item.content.toLowerCase().includes(searchLower)) ||
+                (item.source && item.source.toLowerCase().includes(searchLower)) ||
+                (item.author && item.author.toLowerCase().includes(searchLower))
+            );
+        }
+        
+        // Filter pending news if search term provided
+        let filteredPendingNews = allPendingNews;
+        if (pendingSearchTerm.trim()) {
+            const searchLower = pendingSearchTerm.toLowerCase();
+            filteredPendingNews = allPendingNews.filter(item => 
+                (item.title && item.title.toLowerCase().includes(searchLower)) ||
+                (item.content && item.content.toLowerCase().includes(searchLower)) ||
+                (item.source && item.source.toLowerCase().includes(searchLower)) ||
+                (item.author && item.author.toLowerCase().includes(searchLower))
+            );
+        }
+        
+        if (filteredNews.length === 0) {
+            if (publishedList) {
+                publishedList.innerHTML = searchTerm.trim()
+                    ? `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No news articles found matching "${searchTerm}"</p>`
+                    : '<p>No news articles published yet.</p>';
+            }
+        } else {
+            if (publishedList) {
+                publishedList.innerHTML = filteredNews.map((item) => {
+                    const newsDate = item.date ? new Date(item.date).toLocaleDateString() : 'No date';
+                    return `
+                    <div class="item-card">
+                        <div class="item-card-content">
+                            <h3>${item.title}</h3>
+                            <p><strong>Source:</strong> ${item.source || 'N/A'} | <strong>Date:</strong> ${newsDate}</p>
+                            <p>${item.content ? (item.content.length > 150 ? item.content.substring(0, 150) + '...' : item.content) : 'No content'}</p>
+                            ${item.link ? `<p><a href="${item.link}" target="_blank">Read more →</a></p>` : ''}
+                        </div>
+                        <div class="item-card-actions">
+                            <button class="btn btn-danger" onclick="deleteNews(${item.id})">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                        </div>
+                    </div>
+                `;
+                }).join('');
+            }
+        }
+        
+        if (filteredPendingNews.length === 0) {
+            if (pendingList) {
+                pendingList.innerHTML = pendingSearchTerm.trim()
+                    ? `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No pending news found matching "${pendingSearchTerm}"</p>`
+                    : '<p>No pending news submissions.</p>';
+            }
+        } else {
+            if (pendingList) {
+                pendingList.innerHTML = filteredPendingNews.map((item) => {
+                    const submittedDate = item.submitted_at ? new Date(item.submitted_at).toLocaleDateString() : 'Unknown';
+                    return `
+                    <div class="item-card">
+                        <div class="item-card-content">
+                            <h3>${item.title}</h3>
+                            <p><strong>Submitted:</strong> ${submittedDate}</p>
+                            <p>${item.content ? (item.content.length > 150 ? item.content.substring(0, 150) + '...' : item.content) : 'No content'}</p>
+                        </div>
+                        <div class="item-card-actions">
+                            <button class="btn btn-primary" onclick="approveNews(${item.id})">
+                                <i class="fas fa-check"></i> Approve
+                            </button>
+                            <button class="btn btn-danger" onclick="rejectNews(${item.id})">
+                                <i class="fas fa-times"></i> Reject
+                            </button>
+                        </div>
+                    </div>
+                `;
+                }).join('');
+            }
+        }
+    } catch (error) {
+        console.error('Error loading news:', error);
+        const publishedList = document.getElementById('news-list');
+        const pendingList = document.getElementById('pending-news-list');
+        if (publishedList) publishedList.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Error loading news. Please try again.</p>';
+        if (pendingList) pendingList.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Error loading pending news. Please try again.</p>';
     }
 }
 
-document.getElementById('news-form').addEventListener('submit', (e) => {
+document.getElementById('news-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     
-    const news = {
-        id: Date.now(),
-        title: document.getElementById('news-title').value,
-        content: document.getElementById('news-content').value,
-        image: document.getElementById('news-image').value,
-        link: document.getElementById('news-link').value,
-        source: document.getElementById('news-source').value,
-        date: new Date().toISOString()
-    };
-    
-    const newsList = JSON.parse(localStorage.getItem('admin-news') || '[]');
-    newsList.push(news);
-    localStorage.setItem('admin-news', JSON.stringify(newsList));
-    
-    showAlert('news-alert', '✅ News article published!', 'success');
-    document.getElementById('news-form').reset();
-    loadNews();
-    
-    // Trigger real-time update event
-    window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'news' } }));
+    try {
+        if (!window.supabase) {
+            showAlert('news-alert', '❌ Database connection not available. Please refresh the page.', 'error');
+            return;
+        }
+
+        const newsData = {
+            title: document.getElementById('news-title').value,
+            content: document.getElementById('news-content').value,
+            image: document.getElementById('news-image').value || null,
+            link: document.getElementById('news-link').value || null,
+            source: document.getElementById('news-source').value || null,
+            author: document.getElementById('news-author') ? document.getElementById('news-author').value || null : null,
+            date: new Date().toISOString()
+        };
+        
+        const { error } = await window.supabase
+            .from('news')
+            .insert([newsData]);
+        
+        if (error) throw error;
+        
+        showAlert('news-alert', '✅ News article published!', 'success');
+        document.getElementById('news-form').reset();
+        await loadNews();
+        
+        // Trigger real-time update event
+        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'news' } }));
+        
+        // Also trigger storage event for cross-tab updates
+        try {
+            localStorage.setItem('news-updated', Date.now().toString());
+            localStorage.removeItem('news-updated');
+        } catch (e) {
+            // Ignore storage errors
+        }
+    } catch (error) {
+        console.error('Error saving news:', error);
+        showAlert('news-alert', `❌ Error saving news: ${error.message || 'Please try again.'}`, 'error');
+    }
 });
 
-function approveNews(index) {
-    const pendingNews = JSON.parse(localStorage.getItem('pending-news') || '[]');
-    const news = pendingNews[index];
-    news.date = new Date().toISOString();
-    
-    const newsList = JSON.parse(localStorage.getItem('admin-news') || '[]');
-    newsList.push(news);
-    localStorage.setItem('admin-news', JSON.stringify(newsList));
-    
-    pendingNews.splice(index, 1);
-    localStorage.setItem('pending-news', JSON.stringify(pendingNews));
-    
-    loadNews();
-    
-    // Trigger real-time update event
-    window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'news' } }));
-    window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'news' } }));
-}
+async function approveNews(newsId) {
+    try {
+        if (!window.supabase) {
+            showAlert('news-alert', '❌ Database connection not available. Please refresh the page.', 'error');
+            return;
+        }
 
-function rejectNews(index) {
-    if (confirm('Are you sure you want to reject this news submission?')) {
-        const pendingNews = JSON.parse(localStorage.getItem('pending-news') || '[]');
-        pendingNews.splice(index, 1);
-        localStorage.setItem('pending-news', JSON.stringify(pendingNews));
-        loadNews();
+        // Get the pending news item
+        const { data: pendingNews, error: fetchError } = await window.supabase
+            .from('pending_news')
+            .select('*')
+            .eq('id', newsId)
+            .single();
+        
+        if (fetchError || !pendingNews) {
+            showAlert('news-alert', '❌ Pending news not found.', 'error');
+            return;
+        }
+        
+        // Insert into published news
+        const newsData = {
+            title: pendingNews.title,
+            content: pendingNews.content,
+            image: pendingNews.image || null,
+            link: pendingNews.link || null,
+            source: pendingNews.source || null,
+            author: pendingNews.author || null,
+            date: new Date().toISOString()
+        };
+        
+        const { error: insertError } = await window.supabase
+            .from('news')
+            .insert([newsData]);
+        
+        if (insertError) throw insertError;
+        
+        // Delete from pending news
+        const { error: deleteError } = await window.supabase
+            .from('pending_news')
+            .delete()
+            .eq('id', newsId);
+        
+        if (deleteError) throw deleteError;
+        
+        await loadNews();
+        
+        // Trigger real-time update event
+        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'news' } }));
+        
+        // Also trigger storage event
+        try {
+            localStorage.setItem('news-updated', Date.now().toString());
+            localStorage.removeItem('news-updated');
+        } catch (e) {
+            // Ignore storage errors
+        }
+    } catch (error) {
+        console.error('Error approving news:', error);
+        showAlert('news-alert', `❌ Error approving news: ${error.message || 'Please try again.'}`, 'error');
     }
 }
 
-function deleteNews(index) {
-    if (confirm('Are you sure you want to delete this news article?')) {
-        const news = JSON.parse(localStorage.getItem('admin-news') || '[]');
-        news.splice(index, 1);
-        localStorage.setItem('admin-news', JSON.stringify(news));
-        loadNews();
+async function rejectNews(newsId) {
+    if (!confirm('Are you sure you want to reject this news submission?')) {
+        return;
+    }
+    
+    try {
+        if (!window.supabase) {
+            showAlert('news-alert', '❌ Database connection not available. Please refresh the page.', 'error');
+            return;
+        }
+
+        const { error } = await window.supabase
+            .from('pending_news')
+            .delete()
+            .eq('id', newsId);
+        
+        if (error) throw error;
+        
+        await loadNews();
+    } catch (error) {
+        console.error('Error rejecting news:', error);
+        showAlert('news-alert', `❌ Error rejecting news: ${error.message || 'Please try again.'}`, 'error');
+    }
+}
+
+async function deleteNews(newsId) {
+    if (!confirm('Are you sure you want to delete this news article?')) {
+        return;
+    }
+    
+    try {
+        if (!window.supabase) {
+            showAlert('news-alert', '❌ Database connection not available. Please refresh the page.', 'error');
+            return;
+        }
+
+        const { error } = await window.supabase
+            .from('news')
+            .delete()
+            .eq('id', newsId);
+        
+        if (error) throw error;
+        
+        await loadNews();
+        
+        // Trigger real-time update event
         window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'news' } }));
+        
+        // Also trigger storage event
+        try {
+            localStorage.setItem('news-updated', Date.now().toString());
+            localStorage.removeItem('news-updated');
+        } catch (e) {
+            // Ignore storage errors
+        }
+    } catch (error) {
+        console.error('Error deleting news:', error);
+        showAlert('news-alert', `❌ Error deleting news: ${error.message || 'Please try again.'}`, 'error');
     }
 }
 
