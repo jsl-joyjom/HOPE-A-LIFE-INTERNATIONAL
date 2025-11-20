@@ -593,6 +593,9 @@
             <button class="admin-tab" data-tab="pending-stories">
                 <i class="fas fa-clock"></i> Pending Stories <span class="pending-badge" id="pending-count">0</span>
             </button>
+            <button class="admin-tab" data-tab="contact-messages">
+                <i class="fas fa-envelope"></i> Contact Messages <span class="pending-badge" id="contact-count">0</span>
+            </button>
             <button class="admin-tab" data-tab="events">
                 <i class="fas fa-calendar-alt"></i> Events
             </button>
@@ -756,6 +759,21 @@
                 </div>
                 <p style="text-align: center; color: var(--text-secondary); margin-bottom: 1.5rem;">Review and approve user-submitted stories of transformation</p>
                 <div id="pending-stories-list" class="items-list"></div>
+            </div>
+        </div>
+        
+        <!-- Contact Messages Tab -->
+        <div class="admin-content" id="contact-messages-tab">
+            <div class="admin-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                    <h2 style="margin: 0;">Contact Messages</h2>
+                    <div class="admin-search-wrapper">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="contact-messages-search" class="admin-search-input" placeholder="Search by name, email, subject, or message...">
+                    </div>
+                </div>
+                <p style="text-align: center; color: var(--text-secondary); margin-bottom: 1.5rem;">View and manage contact form submissions</p>
+                <div id="contact-messages-list" class="items-list"></div>
             </div>
         </div>
         

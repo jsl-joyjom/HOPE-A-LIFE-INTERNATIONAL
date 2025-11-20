@@ -191,7 +191,22 @@ CREATE TABLE IF NOT EXISTS pending_stories (
 );
 
 -- ============================================
--- 12. EMAIL LOGS TABLE
+-- 12. CONTACT MESSAGES TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS contact_messages (
+    id BIGSERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    subject TEXT,
+    message TEXT NOT NULL,
+    status TEXT DEFAULT 'new' CHECK (status IN ('new', 'read', 'replied', 'archived')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    replied_at TIMESTAMP WITH TIME ZONE,
+    replied_by TEXT
+);
+
+-- ============================================
+-- 13. EMAIL LOGS TABLE
 -- ============================================
 CREATE TABLE IF NOT EXISTS email_logs (
     id BIGSERIAL PRIMARY KEY,
@@ -235,6 +250,10 @@ CREATE INDEX IF NOT EXISTS idx_daily_verses_date ON daily_verses(date);
 -- Pending stories indexes
 CREATE INDEX IF NOT EXISTS idx_pending_stories_status ON pending_stories(status);
 CREATE INDEX IF NOT EXISTS idx_pending_stories_submitted_at ON pending_stories(submitted_at DESC);
+
+-- Contact messages indexes
+CREATE INDEX IF NOT EXISTS idx_contact_messages_status ON contact_messages(status);
+CREATE INDEX IF NOT EXISTS idx_contact_messages_created_at ON contact_messages(created_at DESC);
 
 -- Photos indexes
 CREATE INDEX IF NOT EXISTS idx_photos_date ON photos(date DESC);
@@ -304,6 +323,7 @@ ALTER TABLE publications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE daily_quotes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE daily_verses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pending_stories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE contact_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE email_logs ENABLE ROW LEVEL SECURITY;
 
 -- Public read access (for website visitors)
@@ -332,6 +352,7 @@ CREATE POLICY "Allow all operations" ON publications FOR ALL USING (true);
 CREATE POLICY "Allow all operations" ON daily_quotes FOR ALL USING (true);
 CREATE POLICY "Allow all operations" ON daily_verses FOR ALL USING (true);
 CREATE POLICY "Allow all operations" ON pending_stories FOR ALL USING (true);
+CREATE POLICY "Allow all operations" ON contact_messages FOR ALL USING (true);
 CREATE POLICY "Allow all operations" ON email_logs FOR ALL USING (true);
 
 -- ============================================

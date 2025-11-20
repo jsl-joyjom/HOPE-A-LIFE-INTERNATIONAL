@@ -761,11 +761,51 @@ const initContactForm = () => {
         setLoading(true);
 
         try {
-            await window.emailjs.sendForm(serviceId, templateId, form);
+            // Get form data
+            const formData = new FormData(form);
+            const contactData = {
+                name: formData.get('name') || '',
+                email: formData.get('email') || '',
+                subject: formData.get('subject') || '',
+                message: formData.get('message') || ''
+            };
+            
+            // Save to Supabase if available
+            if (window.supabase) {
+                try {
+                    const { error: dbError } = await window.supabase
+                        .from('contact_messages')
+                        .insert([{
+                            name: contactData.name,
+                            email: contactData.email,
+                            subject: contactData.subject || null,
+                            message: contactData.message,
+                            status: 'new'
+                        }]);
+                    
+                    if (dbError) {
+                        console.error('Error saving contact message to database:', dbError);
+                        // Continue with EmailJS even if DB save fails
+                    } else {
+                        console.log('✅ Contact message saved to Supabase');
+                        // Trigger event for admin panel
+                        window.dispatchEvent(new CustomEvent('new-contact-message', { detail: contactData }));
+                    }
+                } catch (dbError) {
+                    console.error('Error saving to database:', dbError);
+                    // Continue with EmailJS even if DB save fails
+                }
+            }
+            
+            // Send via EmailJS (if configured)
+            if (emailJsReady) {
+                await window.emailjs.sendForm(serviceId, templateId, form);
+            }
+            
             form.reset();
             toggleMessage(successMessage, true);
         } catch (sendError) {
-            console.error('EmailJS submission failed:', sendError);
+            console.error('Form submission failed:', sendError);
             toggleMessage(errorMessage, true);
         } finally {
             setLoading(false);

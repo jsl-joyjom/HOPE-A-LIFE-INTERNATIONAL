@@ -77,6 +77,9 @@ function loadTabContent(tab) {
         case 'pending-stories':
             loadPendingStories();
             break;
+        case 'contact-messages':
+            loadContactMessages();
+            break;
         case 'events':
             loadEvents();
             break;
@@ -1291,6 +1294,175 @@ async function deletePendingStory(storyId) {
     } catch (error) {
         console.error('Error deleting story:', error);
         showAlert('testimonial-alert', `❌ Error deleting story: ${error.message || 'Please try again.'}`, 'error');
+    }
+}
+
+// Contact Messages Management
+async function loadContactMessages(searchTerm = '') {
+    try {
+        if (!window.supabase) {
+            const list = document.getElementById('contact-messages-list');
+            if (list) {
+                list.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Database connection not available. Please refresh the page.</p>';
+            }
+            return;
+        }
+
+        const { data: messages, error } = await window.supabase
+            .from('contact_messages')
+            .select('*')
+            .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        
+        const list = document.getElementById('contact-messages-list');
+        if (!list) return;
+        
+        const allMessages = messages || [];
+        const newCount = allMessages.filter(m => m.status === 'new').length;
+        const countElement = document.getElementById('contact-count');
+        if (countElement) {
+            countElement.textContent = newCount;
+        }
+        
+        // Filter messages if search term provided
+        let filteredMessages = allMessages;
+        if (searchTerm.trim()) {
+            const searchLower = searchTerm.toLowerCase();
+            filteredMessages = allMessages.filter(msg => 
+                (msg.name && msg.name.toLowerCase().includes(searchLower)) ||
+                (msg.email && msg.email.toLowerCase().includes(searchLower)) ||
+                (msg.subject && msg.subject.toLowerCase().includes(searchLower)) ||
+                (msg.message && msg.message.toLowerCase().includes(searchLower))
+            );
+        }
+        
+        if (filteredMessages.length === 0) {
+            list.innerHTML = searchTerm.trim()
+                ? `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No messages found matching "${searchTerm}"</p>`
+                : '<p style="text-align: center; color: var(--text-secondary);">No contact messages yet.</p>';
+            return;
+        }
+        
+        // Sort: new messages first
+        const sortedMessages = [...filteredMessages].sort((a, b) => {
+            if (a.status === 'new' && b.status !== 'new') return -1;
+            if (a.status !== 'new' && b.status === 'new') return 1;
+            return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+        });
+        
+        list.innerHTML = sortedMessages.map((msg) => {
+            const createdDate = msg.created_at ? new Date(msg.created_at).toLocaleDateString() : 'Unknown';
+            const statusColor = msg.status === 'new' ? '#f59e0b' : msg.status === 'read' ? '#3b82f6' : msg.status === 'replied' ? '#10b981' : '#6b7280';
+            return `
+            <div class="item-card" style="border-left: 4px solid ${statusColor};">
+                <div class="item-card-content">
+                    <h3>${msg.name || 'Anonymous'}</h3>
+                    <p><strong>Email:</strong> <a href="mailto:${msg.email}">${msg.email || 'N/A'}</a></p>
+                    ${msg.subject ? `<p><strong>Subject:</strong> ${msg.subject}</p>` : ''}
+                    <p><strong>Received:</strong> ${createdDate}</p>
+                    <p><strong>Status:</strong> <span style="text-transform: capitalize; color: ${statusColor};">${msg.status || 'new'}</span></p>
+                    <details style="margin-top: 1rem;">
+                        <summary style="cursor: pointer; color: var(--primary-blue); font-weight: 600;">View Message</summary>
+                        <div style="margin-top: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: 8px;">
+                            <p style="white-space: pre-wrap;">${msg.message || 'No message content'}</p>
+                        </div>
+                    </details>
+                </div>
+                <div class="item-card-actions">
+                    ${msg.status === 'new' ? `
+                        <button class="btn btn-primary" onclick="markContactMessageRead(${msg.id})">
+                            <i class="fas fa-check"></i> Mark as Read
+                        </button>
+                    ` : ''}
+                    ${msg.status !== 'replied' ? `
+                        <button class="btn btn-success" onclick="markContactMessageReplied(${msg.id})">
+                            <i class="fas fa-reply"></i> Mark as Replied
+                        </button>
+                    ` : ''}
+                    <button class="btn btn-secondary" onclick="deleteContactMessage(${msg.id})">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </div>
+            </div>
+        `;
+        }).join('');
+    } catch (error) {
+        console.error('Error loading contact messages:', error);
+        const list = document.getElementById('contact-messages-list');
+        if (list) {
+            list.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Error loading contact messages. Please try again.</p>';
+        }
+    }
+}
+
+async function markContactMessageRead(messageId) {
+    try {
+        if (!window.supabase) {
+            showAlert('testimonial-alert', '❌ Database connection not available. Please refresh the page.', 'error');
+            return;
+        }
+        
+        const { error } = await window.supabase
+            .from('contact_messages')
+            .update({ status: 'read' })
+            .eq('id', messageId);
+        
+        if (error) throw error;
+        
+        await loadContactMessages();
+    } catch (error) {
+        console.error('Error marking message as read:', error);
+        showAlert('testimonial-alert', `❌ Error: ${error.message || 'Please try again.'}`, 'error');
+    }
+}
+
+async function markContactMessageReplied(messageId) {
+    try {
+        if (!window.supabase) {
+            showAlert('testimonial-alert', '❌ Database connection not available. Please refresh the page.', 'error');
+            return;
+        }
+        
+        const { error } = await window.supabase
+            .from('contact_messages')
+            .update({ 
+                status: 'replied',
+                replied_at: new Date().toISOString()
+            })
+            .eq('id', messageId);
+        
+        if (error) throw error;
+        
+        await loadContactMessages();
+    } catch (error) {
+        console.error('Error marking message as replied:', error);
+        showAlert('testimonial-alert', `❌ Error: ${error.message || 'Please try again.'}`, 'error');
+    }
+}
+
+async function deleteContactMessage(messageId) {
+    if (!confirm('Are you sure you want to delete this contact message?')) {
+        return;
+    }
+    
+    try {
+        if (!window.supabase) {
+            showAlert('testimonial-alert', '❌ Database connection not available. Please refresh the page.', 'error');
+            return;
+        }
+        
+        const { error } = await window.supabase
+            .from('contact_messages')
+            .delete()
+            .eq('id', messageId);
+        
+        if (error) throw error;
+        
+        await loadContactMessages();
+    } catch (error) {
+        console.error('Error deleting contact message:', error);
+        showAlert('testimonial-alert', `❌ Error: ${error.message || 'Please try again.'}`, 'error');
     }
 }
 
@@ -3052,6 +3224,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (pendingStoriesSearch) {
         pendingStoriesSearch.addEventListener('input', (e) => {
             loadPendingStories(e.target.value);
+        });
+    }
+    
+    // Contact Messages search
+    const contactMessagesSearch = document.getElementById('contact-messages-search');
+    if (contactMessagesSearch) {
+        contactMessagesSearch.addEventListener('input', (e) => {
+            loadContactMessages(e.target.value);
         });
     }
     

@@ -103,65 +103,70 @@ const initImpactForm = () => {
 };
 
 // Save story submission to pending queue for admin approval
-const simulateFormSubmission = (formData) => {
-    return new Promise((resolve, reject) => {
-        try {
-            // Get form data
-            const storyData = {
-                id: Date.now() + Math.random(), // Ensure unique ID
-                status: 'pending', // pending, approved, rejected
-                submittedAt: new Date().toISOString(),
-                name: formData.get('name') || 'Anonymous',
-                email: formData.get('email') || '',
-                location: formData.get('location') || '',
-                program: formData.get('program') || '',
-                storyTitle: formData.get('story-title') || '',
-                story: formData.get('story') || '',
-                imageUrl: '', // Will be set if image uploaded
-                imageName: '',
-                consent: formData.get('consent') === 'on',
-                newsletter: formData.get('newsletter') === 'on'
-            };
-            
-            console.log('Preparing story data:', {
-                name: storyData.name,
-                email: storyData.email,
-                storyTitle: storyData.storyTitle,
-                hasStory: !!storyData.story,
-                hasImage: false
-            });
-            
-            // Handle image file if uploaded
-            const imageFile = formData.get('image');
-            if (imageFile && imageFile.size > 0) {
-                console.log('Image file detected:', imageFile.name, imageFile.size);
-                // Convert to base64 for localStorage (in production, upload to server)
-                const reader = new FileReader();
+const simulateFormSubmission = async (formData) => {
+    try {
+        // Get form data
+        const storyData = {
+            name: formData.get('name') || 'Anonymous',
+            email: formData.get('email') || '',
+            location: formData.get('location') || '',
+            program: formData.get('program') || '',
+            storyTitle: formData.get('story-title') || '',
+            story: formData.get('story') || '',
+            imageUrl: '', // Will be set if image uploaded
+            imageName: '',
+            consent: formData.get('consent') === 'on',
+            newsletter: formData.get('newsletter') === 'on'
+        };
+        
+        console.log('Preparing story data:', {
+            name: storyData.name,
+            email: storyData.email,
+            storyTitle: storyData.storyTitle,
+            hasStory: !!storyData.story,
+            hasImage: false
+        });
+        
+        // Handle image file if uploaded
+        const imageFile = formData.get('image');
+        if (imageFile && imageFile.size > 0) {
+            console.log('Image file detected:', imageFile.name, imageFile.size);
+            // Convert to base64 for storage (in production, upload to server)
+            const reader = new FileReader();
+            return new Promise((resolve, reject) => {
                 reader.onload = async (e) => {
-                    storyData.imageUrl = e.target.result;
-                    storyData.imageName = imageFile.name;
-                    console.log('Image converted, saving story...');
-                    await savePendingStory(storyData);
-                    resolve({ success: true });
+                    try {
+                        storyData.imageUrl = e.target.result;
+                        storyData.imageName = imageFile.name;
+                        console.log('Image converted, saving story...');
+                        await savePendingStory(storyData);
+                        resolve({ success: true });
+                    } catch (error) {
+                        reject(error);
+                    }
                 };
                 reader.onerror = async (error) => {
                     console.error('Error reading image file:', error);
                     storyData.imageUrl = '';
                     storyData.imageName = '';
-                    await savePendingStory(storyData);
-                    resolve({ success: true });
+                    try {
+                        await savePendingStory(storyData);
+                        resolve({ success: true });
+                    } catch (err) {
+                        reject(err);
+                    }
                 };
                 reader.readAsDataURL(imageFile);
-            } else {
-                console.log('No image file, saving story directly...');
-                await savePendingStory(storyData);
-                resolve({ success: true });
-            }
-        } catch (error) {
-            console.error('Error in simulateFormSubmission:', error);
-            reject(error);
+            });
+        } else {
+            console.log('No image file, saving story directly...');
+            await savePendingStory(storyData);
+            return { success: true };
         }
-    });
+    } catch (error) {
+        console.error('Error in simulateFormSubmission:', error);
+        throw error;
+    }
 };
 
 // Save pending story to Supabase
@@ -173,13 +178,19 @@ const savePendingStory = async (storyData) => {
         }
         
         // Prepare data for Supabase (pending_stories table)
+        // Map form fields to database fields
         const pendingStoryData = {
-            name: storyData.name,
-            role: storyData.role || null,
-            quote: storyData.story || storyData.quote,
+            name: storyData.name || 'Anonymous',
+            role: storyData.location ? `From ${storyData.location}` : null, // Use location as role context
+            quote: storyData.story || storyData.quote || storyData.storyTitle || '', // Use story content as quote
             tags: storyData.program || storyData.tags || null,
             status: 'pending'
         };
+        
+        // Ensure quote is not empty (required field)
+        if (!pendingStoryData.quote || pendingStoryData.quote.trim() === '') {
+            throw new Error('Story content is required. Please provide your impact story.');
+        }
         
         // Insert into Supabase
         const { data: insertedStory, error } = await window.supabase
