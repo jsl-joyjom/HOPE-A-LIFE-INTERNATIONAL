@@ -702,6 +702,10 @@ async function editPhoto(photoId) {
     form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     
     showAlert('photo-alert', '📝 Editing photo. Update the fields and click "Update Photo" to save changes.', 'info');
+    } catch (error) {
+        console.error('Error editing photo:', error);
+        showAlert('photo-alert', `❌ Error loading photo for editing: ${error.message || 'Please try again.'}`, 'error');
+    }
 }
 
 async function deletePhoto(photoId) {
@@ -2753,5 +2757,4 @@ document.addEventListener('DOMContentLoaded', () => {
 // Load initial content
 loadTabContent('testimonials');
 updatePendingCount();
-
 
