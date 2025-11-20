@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Join Hope A Life International events to support widows, orphans, and vulnerable communities across Kenya.">
+    <title>Events | Hope A Life International</title>
+    <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    
+    <div class="progress-bar" role="presentation">
+        <div class="progress-fill"></div>
+    </div>
+
+    <header>
+        <div class="container">
+            <nav>
+                <div class="logo-container">
+                    <img src="https://hopealife.org/images/logo.png" alt="Hope A Life International Logo" class="logo-img">
+                    <span class="nav-slogan">Hope starts with you</span>
+                </div>
+                <ul class="nav-links" id="primary-navigation" aria-hidden="true">
+                    <button class="nav-collapse" type="button" aria-label="Close navigation">
+                        <i class="fas fa-angle-right" aria-hidden="true"></i>
+                    </button>
+                    <li><a href="index.html" aria-label="Home">Home</a></li>
+                    <li class="dropdown">
+                        <a href="#" aria-label="About">About</a>
+                        <ul class="dropdown-menu">
+                            <li><a href="about.html" aria-label="About us">About Us</a></li>
+                            <li><a href="team.html" aria-label="Our team">Team</a></li>
+                        </ul>
+                    </li>
+                    <li><a href="our-programs.html" aria-label="Our programs">Our Programs</a></li>
+                    <li><a href="impact.html" aria-label="Our impact">Our Impact</a></li>
+                    <li><a href="events.html" aria-label="Events" class="active">Events</a></li>
+                    <li class="dropdown">
+                        <a href="#" aria-label="Media">Media</a>
+                        <ul class="dropdown-menu">
+                            <li><a href="gallery.html">Photo Gallery</a></li>
+                            <li><a href="video.html">Video Gallery</a></li>
+                            <li><a href="articles.html">Publications</a></li>
+                            <li><a href="latestnews.html">News</a></li>
+                        </ul>
+                    </li>
+                    <li><a href="partners.html" aria-label="Partners">Partners</a></li>
+                    <li><a href="contacts.html" aria-label="Contact us">Contact</a></li>
+                    <li class="nav-sidebar-footer">
+                        <img src="https://hopealife.org/images/logo.png" alt="Hope A Life International Logo" class="nav-sidebar-logo">
+                    </li>
+                </ul>
+                <div class="nav-actions">
+                    <button class="hamburger" type="button" aria-label="Toggle navigation menu" aria-controls="primary-navigation" aria-expanded="false">
+                        <span class="hamburger-line"></span>
+                        <span class="hamburger-line"></span>
+                        <span class="hamburger-line"></span>
+                    </button>
+                    <a href="donate.html" class="nav-donate" aria-label="Donate to Hope A Life International">
+                        <i class="fas fa-heart" aria-hidden="true"></i>
+                        <span>Donate</span>
+                    </a>
+                    <button class="theme-toggle" type="button" aria-label="Toggle dark mode" title="Toggle dark mode">
+                        <i class="fas fa-moon" aria-hidden="true"></i>
+                        <i class="fas fa-sun" aria-hidden="true" style="display: none;"></i>
+                        <span class="sr-only">Toggle dark mode</span>
+                    </button>
+                </div>
+            </nav>
+        </div>
+        <button class="header-collapse" type="button" aria-label="Collapse header" aria-pressed="false" title="Collapse header">
+            <i class="fas fa-chevron-up" aria-hidden="true"></i>
+            <span class="sr-only">Collapse header</span>
+        </button>
+        <div class="nav-overlay" aria-hidden="true"></div>
+    </header>
+
+    <section class="hero" aria-labelledby="hero-title">
+        <div class="container">
+            <div class="hero-content">
+                <h1 id="hero-title">Join Our Events</h1>
+                <p>Participate in our events to support and learn about our mission to empower widows, orphans, and vulnerable communities in Kenya.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="events" aria-labelledby="events-title">
+        <div class="container">
+            <h2 class="section-title" id="events-title">Our Events</h2>
+            <p class="section-subtitle">Discover upcoming and past events that drive our mission forward. Join us to make a difference.</p>
+
+            <div class="tabs" role="tablist">
+                <button class="tab-button active" type="button" data-tab-target="upcoming-events" role="tab" aria-selected="true">Upcoming Events</button>
+                <button class="tab-button" type="button" data-tab-target="past-events" role="tab" aria-selected="false">Past Events</button>
+            </div>
+
+            <div class="event-grid active" id="upcoming-events" role="tabpanel" aria-labelledby="Upcoming Events">
+                <!-- Events will be loaded dynamically from admin panel -->
+            </div>
+
+            <div class="event-grid" id="past-events" role="tabpanel" aria-labelledby="Past Events">
+                <!-- Events will be loaded dynamically from admin panel -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer aria-label="Footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <div class="footer-logo">
+                        <img src="https://hopealife.org/images/logofooter.png" alt="Hope A Life International Footer Logo" class="footer-logo-img" loading="lazy">
+                        <h3></h3>
+                    </div>
+                    <p>A charitable organization dedicated to restoring dignity and hope to widows, orphans, and vulnerable communities. Registered in Kenya under the Societies Act since 2008.</p>
+                    <div class="footer-social">
+                        <a href="https://facebook.com/hopealifeint" aria-label="Facebook"><i class="fab fa-facebook-f"></i></a>
+                        <a href="https://twitter.com/hopealifeint" aria-label="Twitter"><i class="fab fa-twitter"></i></a>
+                        <a href="https://instagram.com/hopealifeint" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
+                        <a href="https://linkedin.com/company/hopealifeint" aria-label="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+                    </div>
+                </div>
+                <div class="footer-section">
+                    <h4>Our Programs</h4>
+                    <ul>
+                        <li><a href="our-programs.html#widows-voices" aria-label="Widows' Voices program">Widows' Voices</a></li>
+                        <li><a href="our-programs.html#orphans" aria-label="Orphans Projects">Orphans Projects</a></li>
+                        <li><a href="our-programs.html#fgm" aria-label="Fight Against FGM">Fight Against FGM</a></li>
+                        <li><a href="our-programs.html#early-marriage" aria-label="Against Early Marriage">Against Early Marriage</a></li>
+                        <li><a href="our-programs.html#gbv" aria-label="Against Gender-Based Violence">Against GBV</a></li>
+                        <li><a href="our-programs.html#disabilities" aria-label="Children with Disabilities">Children with Disabilities</a></li>
+                        <li><a href="our-programs.html#mentorship" aria-label="Girl Mentorship">Girl Mentorship</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Contact Information</h4>
+                    <ul>
+                        <li><a href="mailto:info@hopealife.org" aria-label="Email us">info@hopealife.org</a></li>
+                        <li><a href="tel:+254792339752" aria-label="Call us">+254 792 339 752</a></li>
+                        <li>Nyaku House, Room 107<br>Argwings Kodhek Road, Hurlingham<br>Nairobi, Kenya</li>
+                        <li><strong>Website:</strong> www.hopealife.org</li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Subscribe to Newsletter</h4>
+                    <p>Stay updated with our latest news, events, and impact stories.</p>
+                    <form class="newsletter-form">
+                        <input type="email" placeholder="Your email" required>
+                        <button type="submit">Subscribe</button>
+                    </form>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 Hope A Life International. All rights reserved. | Registered Charity Organization in Kenya</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="assets/js/main.js" defer></script>
+    <script src="assets/js/events-page-loader.js" defer></script>
+    </main>
+
+    <!-- Floating Events & Notifications Icon -->
+    <div class="floating-notifications" id="floating-notifications" role="button" tabindex="0" aria-label="View upcoming events and notifications">
+        <div class="notification-icon-wrapper">
+            <i class="fas fa-bell" aria-hidden="true"></i>
+            <span class="notification-badge" id="notification-badge">0</span>
+        </div>
+        <div class="notification-pulse" aria-hidden="true"></div>
+    </div>
+
+    <!-- Events & Notifications Modal -->
+    <div class="events-modal" id="events-modal" role="dialog" aria-labelledby="events-modal-title" aria-hidden="true">
+        <div class="events-modal-overlay" id="events-modal-overlay"></div>
+        <div class="events-modal-content">
+            <div class="events-modal-header">
+                <h2 id="events-modal-title">Upcoming Events & Notifications</h2>
+                <button class="events-modal-close" id="events-modal-close" aria-label="Close events modal">
+                    <i class="fas fa-times" aria-hidden="true"></i>
+                </button>
+            </div>
+            <div class="events-modal-body">
+                <div id="events-container-modal" class="events-grid-modal">
+                    <p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No upcoming events at this time. Check back soon!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/js/events-loader.js" defer></script>
+    
+    <!-- Event Registration Modal -->
+    <div class="event-registration-modal" id="event-registration-modal" role="dialog" aria-labelledby="registration-modal-title" aria-hidden="true">
+        <div class="event-registration-overlay" id="event-registration-overlay"></div>
+        <div class="event-registration-content">
+            <div class="event-registration-header">
+                <h2 id="registration-modal-title">Event Registration</h2>
+                <button class="event-registration-close" id="event-registration-close" aria-label="Close registration modal">
+                    <i class="fas fa-times" aria-hidden="true"></i>
+                </button>
+            </div>
+            <div class="event-registration-body">
+                <form id="event-registration-form">
+                    <input type="hidden" id="registration-event-id" name="eventId">
+                    
+                    <div class="form-group">
+                        <label for="registration-type">Registration Type *</label>
+                        <select id="registration-type" name="registrationType" required>
+                            <option value="">Select type...</option>
+                            <option value="individual">Individual</option>
+                            <option value="organization">Organization</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group" id="individual-fields">
+                        <label for="registrant-name">Full Name *</label>
+                        <input type="text" id="registrant-name" name="name" required>
+                    </div>
+                    
+                    <div class="form-group" id="organization-fields" style="display: none;">
+                        <label for="organization-name">Organization Name *</label>
+                        <input type="text" id="organization-name" name="organizationName">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="registrant-email">Email Address *</label>
+                        <input type="email" id="registrant-email" name="email" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="registrant-phone">Phone Number *</label>
+                        <input type="tel" id="registrant-phone" name="phone" required>
+                    </div>
+                    
+                    <div class="form-group" id="organization-contact-fields" style="display: none;">
+                        <label for="contact-person">Contact Person Name *</label>
+                        <input type="text" id="contact-person" name="contactPerson">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="registrant-address">Address</label>
+                        <textarea id="registrant-address" name="address" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="additional-notes">Additional Notes</label>
+                        <textarea id="additional-notes" name="additionalNotes" rows="3" placeholder="Any special requirements or questions..."></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="number-of-attendees">Number of Attendees *</label>
+                        <input type="number" id="number-of-attendees" name="numberOfAttendees" min="1" value="1" required>
+                        <div id="capacity-info" style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);"></div>
+                        <div id="org-capacity-warning" style="margin-top: 0.5rem; font-size: 0.875rem; color: #ef4444; display: none;"></div>
+                    </div>
+                    
+                    <!-- Organization/NGO Attendee Details Section -->
+                    <div id="organization-attendees-section" style="display: none;">
+                        <div class="form-group">
+                            <label>Attendee Details (for Organizations/NGOs)</label>
+                            <div style="margin-bottom: 1rem;">
+                                <button type="button" class="btn-download-template" onclick="downloadAttendeeTemplate()" style="margin-right: 0.5rem;">
+                                    <i class="fas fa-download"></i> Download Excel Template
+                                </button>
+                                <button type="button" class="btn-upload-excel" onclick="document.getElementById('attendee-excel-file').click()">
+                                    <i class="fas fa-upload"></i> Upload Excel File
+                                </button>
+                                <input type="file" id="attendee-excel-file" accept=".xlsx,.xls,.csv" style="display: none;" onchange="handleExcelUpload(event)">
+                            </div>
+                            <small style="color: var(--text-secondary); display: block; margin-bottom: 0.5rem;">
+                                Or manually enter attendee details below:
+                            </small>
+                        </div>
+                        
+                        <div id="attendees-list-container">
+                            <div id="attendees-list"></div>
+                            <button type="button" class="btn-add-attendee" onclick="addAttendeeRow()" style="margin-top: 0.5rem;">
+                                <i class="fas fa-plus"></i> Add Attendee
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="registration-alert"></div>
+                    
+                    <div class="form-actions">
+                        <button type="button" class="btn-cancel" onclick="closeEventRegistration()">Cancel</button>
+                        <button type="submit" class="btn-submit">Submit Registration</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <script src="assets/js/event-registration.js" defer></script>
+    
+    <!-- Event Details Modal -->
+    <div class="event-details-modal" id="event-details-modal" role="dialog" aria-labelledby="event-details-title" aria-hidden="true">
+        <div class="event-details-overlay" id="event-details-overlay"></div>
+        <div class="event-details-content">
+            <div class="event-details-header">
+                <div class="event-details-logo">
+                    <img src="https://hopealife.org/images/logo.png" alt="Hope A Life International Logo">
+                </div>
+                <div class="event-details-header-content">
+                    <h2 id="event-details-title">Event Details</h2>
+                </div>
+                <button class="event-details-close" id="event-details-close" aria-label="Close event details modal">
+                    <i class="fas fa-times" aria-hidden="true"></i>
+                </button>
+            </div>
+            <div class="event-details-body" id="event-details-body">
+                <!-- Content will be dynamically loaded -->
+            </div>
+        </div>
+    </div>
+    
+    <script src="assets/js/event-details-modal.js" defer></script>
+</body>
+</html>
+

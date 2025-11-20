@@ -1,0 +1,2682 @@
+// Admin Panel JavaScript
+
+// Tab switching
+document.querySelectorAll('.admin-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        const targetTab = tab.getAttribute('data-tab');
+        
+        // Update active tab
+        document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        
+        // Update active content
+        document.querySelectorAll('.admin-content').forEach(c => c.classList.remove('active'));
+        document.getElementById(`${targetTab}-tab`).classList.add('active');
+        
+        // Load content for active tab
+        loadTabContent(targetTab);
+    });
+});
+
+// Load content based on active tab
+function loadTabContent(tab) {
+    switch(tab) {
+        case 'testimonials':
+            loadTestimonials();
+            break;
+        case 'photos':
+            loadPhotos();
+            break;
+        case 'videos':
+            loadVideos();
+            break;
+        case 'comments':
+            loadComments();
+            break;
+        case 'pending-stories':
+            loadPendingStories();
+            break;
+        case 'events':
+            loadEvents();
+            break;
+        case 'news':
+            loadNews();
+            break;
+        case 'publications':
+            loadPublications();
+            break;
+        case 'quotes':
+            loadQuotes();
+            loadVerses();
+            break;
+    }
+}
+
+// Testimonials Management
+function loadTestimonials(searchTerm = '') {
+    const testimonials = JSON.parse(localStorage.getItem('admin-testimonials') || '[]');
+    const list = document.getElementById('testimonials-list');
+    
+    // Filter testimonials if search term provided
+    let filteredTestimonials = testimonials;
+    if (searchTerm.trim()) {
+        const searchLower = searchTerm.toLowerCase();
+        filteredTestimonials = testimonials.filter(testimonial => 
+            (testimonial.name && testimonial.name.toLowerCase().includes(searchLower)) ||
+            (testimonial.role && testimonial.role.toLowerCase().includes(searchLower)) ||
+            (testimonial.quote && testimonial.quote.toLowerCase().includes(searchLower)) ||
+            (testimonial.tags && testimonial.tags.toLowerCase().includes(searchLower))
+        );
+    }
+    
+    if (filteredTestimonials.length === 0) {
+        list.innerHTML = searchTerm.trim() 
+            ? `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No testimonials found matching "${searchTerm}"</p>`
+            : '<p>No testimonials added yet. Add one above!</p>';
+        return;
+    }
+    
+    list.innerHTML = filteredTestimonials.map((testimonial, displayIndex) => {
+        // Find original index for edit/delete functions
+        const originalIndex = testimonials.findIndex(t => t.id === testimonial.id);
+        return `
+        <div class="item-card">
+            <div class="item-card-content">
+                <h3>${testimonial.name}</h3>
+                <p><strong>Role:</strong> ${testimonial.role}</p>
+                <p>${testimonial.quote.substring(0, 100)}...</p>
+                ${testimonial.tags ? `<p><strong>Tags:</strong> ${testimonial.tags}</p>` : ''}
+            </div>
+            <div class="item-card-actions">
+                <button class="btn btn-secondary" onclick="editTestimonial(${originalIndex})">
+                    <i class="fas fa-edit"></i> Edit
+                </button>
+                <button class="btn btn-danger" onclick="deleteTestimonial(${originalIndex})">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+            </div>
+        </div>
+    `;
+    }).join('');
+}
+
+// Word count function
+function countWords(text) {
+    if (!text || !text.trim()) return 0;
+    return text.trim().split(/\s+/).filter(word => word.length > 0).length;
+}
+
+// Initialize word counter for testimonial quote
+document.addEventListener('DOMContentLoaded', () => {
+    const quoteTextarea = document.getElementById('testimonial-quote');
+    if (quoteTextarea) {
+        // Create word counter element
+        const wordCounter = document.createElement('small');
+        wordCounter.className = 'word-counter';
+        wordCounter.style.display = 'block';
+        wordCounter.style.marginTop = '0.5rem';
+        wordCounter.style.color = 'var(--text-secondary)';
+        quoteTextarea.parentNode.appendChild(wordCounter);
+        
+        const updateWordCount = () => {
+            const wordCount = countWords(quoteTextarea.value);
+            const maxWords = 100;
+            wordCounter.textContent = `${wordCount} / ${maxWords} words`;
+            
+            if (wordCount > maxWords) {
+                wordCounter.style.color = '#ef4444';
+                wordCounter.classList.add('over-limit');
+            } else {
+                wordCounter.style.color = 'var(--text-secondary)';
+                wordCounter.classList.remove('over-limit');
+            }
+        };
+        
+        quoteTextarea.addEventListener('input', updateWordCount);
+        quoteTextarea.addEventListener('paste', () => {
+            setTimeout(updateWordCount, 10);
+        });
+        updateWordCount();
+    }
+});
+
+document.getElementById('testimonial-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    
+    const quote = document.getElementById('testimonial-quote').value;
+    const wordCount = countWords(quote);
+    
+    // Validate word count (max 100 words)
+    if (wordCount > 100) {
+        showAlert('testimonial-alert', `❌ Error: Testimonial text exceeds the maximum of 100 words. Current count: ${wordCount} words. Please reduce it to 100 words or less.`, 'error');
+        return;
+    }
+    
+    if (wordCount === 0) {
+        showAlert('testimonial-alert', '❌ Error: Testimonial text is required.', 'error');
+        return;
+    }
+    
+    const testimonial = {
+        id: Date.now(),
+        name: document.getElementById('testimonial-name').value,
+        role: document.getElementById('testimonial-role').value,
+        quote: quote,
+        tags: document.getElementById('testimonial-tags').value,
+        date: new Date().toISOString()
+    };
+    
+    const testimonials = JSON.parse(localStorage.getItem('admin-testimonials') || '[]');
+    testimonials.push(testimonial);
+    localStorage.setItem('admin-testimonials', JSON.stringify(testimonials));
+    
+    showAlert('testimonial-alert', '✅ Testimonial added successfully! It will appear on the Impact page. <a href="impact.html" target="_blank" style="color: inherit; text-decoration: underline;">View Impact Page</a>', 'success');
+    document.getElementById('testimonial-form').reset();
+    
+    // Reset word counter
+    const wordCounter = document.querySelector('#testimonial-quote').parentNode.querySelector('.word-counter');
+    if (wordCounter) {
+        wordCounter.textContent = '0 / 100 words';
+        wordCounter.style.color = 'var(--text-secondary)';
+        wordCounter.classList.remove('over-limit');
+    }
+    
+    loadTestimonials();
+    
+    // Trigger custom event for same-tab updates
+    window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'testimonials' } }));
+});
+
+function deleteTestimonial(index) {
+    if (confirm('Are you sure you want to delete this testimonial?')) {
+        const testimonials = JSON.parse(localStorage.getItem('admin-testimonials') || '[]');
+        testimonials.splice(index, 1);
+        localStorage.setItem('admin-testimonials', JSON.stringify(testimonials));
+        loadTestimonials();
+    }
+}
+
+function editTestimonial(index) {
+    const testimonials = JSON.parse(localStorage.getItem('admin-testimonials') || '[]');
+    const testimonial = testimonials[index];
+    
+    document.getElementById('testimonial-name').value = testimonial.name;
+    document.getElementById('testimonial-role').value = testimonial.role;
+    document.getElementById('testimonial-quote').value = testimonial.quote;
+    document.getElementById('testimonial-tags').value = testimonial.tags || '';
+    
+    // Scroll to form
+    document.getElementById('testimonial-form').scrollIntoView({ behavior: 'smooth' });
+    
+    // Update form to edit mode
+    const form = document.getElementById('testimonial-form');
+    form.dataset.editIndex = index;
+    form.querySelector('button[type="submit"]').innerHTML = '<i class="fas fa-save"></i> Update Testimonial';
+    
+    // Update submit handler
+    form.onsubmit = (e) => {
+        e.preventDefault();
+        
+        const quote = document.getElementById('testimonial-quote').value;
+        const wordCount = countWords(quote);
+        
+        // Validate word count (max 100 words)
+        if (wordCount > 100) {
+            showAlert('testimonial-alert', `❌ Error: Testimonial text exceeds the maximum of 100 words. Current count: ${wordCount} words. Please reduce it to 100 words or less.`, 'error');
+            return;
+        }
+        
+        if (wordCount === 0) {
+            showAlert('testimonial-alert', '❌ Error: Testimonial text is required.', 'error');
+            return;
+        }
+        
+        testimonial.name = document.getElementById('testimonial-name').value;
+        testimonial.role = document.getElementById('testimonial-role').value;
+        testimonial.quote = quote;
+        testimonial.tags = document.getElementById('testimonial-tags').value;
+        
+        testimonials[index] = testimonial;
+        localStorage.setItem('admin-testimonials', JSON.stringify(testimonials));
+        
+        showAlert('testimonial-alert', '✅ Testimonial updated successfully!', 'success');
+        form.reset();
+        delete form.dataset.editIndex;
+        form.querySelector('button[type="submit"]').innerHTML = '<i class="fas fa-save"></i> Save Testimonial';
+        form.onsubmit = arguments.callee;
+        
+        // Reset word counter
+        const wordCounter = document.querySelector('#testimonial-quote').parentNode.querySelector('.word-counter');
+        if (wordCounter) {
+            wordCounter.textContent = '0 / 100 words';
+            wordCounter.style.color = 'var(--text-secondary)';
+            wordCounter.classList.remove('over-limit');
+        }
+        
+        loadTestimonials();
+    };
+}
+
+// Photos Management
+function loadPhotos(searchTerm = '') {
+    const photos = JSON.parse(localStorage.getItem('admin-photos') || '[]');
+    const list = document.getElementById('photos-list');
+    
+    // Filter photos if search term provided
+    let filteredPhotos = photos;
+    if (searchTerm.trim()) {
+        const searchLower = searchTerm.toLowerCase();
+        filteredPhotos = photos.filter(photo => 
+            (photo.title && photo.title.toLowerCase().includes(searchLower)) ||
+            (photo.description && photo.description.toLowerCase().includes(searchLower)) ||
+            (photo.alt && photo.alt.toLowerCase().includes(searchLower))
+        );
+    }
+    
+    if (filteredPhotos.length === 0) {
+        list.innerHTML = searchTerm.trim()
+            ? `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No photos found matching "${searchTerm}"</p>`
+            : '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No photos added yet. Add one above!</p>';
+        return;
+    }
+    
+    // Sort by date (newest first)
+    const sortedPhotos = [...filteredPhotos].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    
+    list.innerHTML = sortedPhotos.map((photo, index) => {
+        // Find original index for edit/delete functions
+        const originalIndex = photos.findIndex(p => p.id === photo.id);
+        const photoDate = photo.date ? new Date(photo.date).toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        }) : 'Unknown date';
+        
+        // Create thumbnail preview (for base64, show first 100 chars, for URL show full)
+        const urlPreview = photo.url ? (photo.url.length > 100 ? photo.url.substring(0, 100) + '...' : photo.url) : 'No URL';
+        const isBase64 = photo.url && photo.url.startsWith('data:image/');
+        
+        return `
+        <div class="photo-list-item">
+            <div class="photo-list-thumbnail">
+                ${photo.url ? `
+                    <img src="${photo.url}" alt="${photo.alt || photo.title || 'Photo'}" 
+                         onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'200\'%3E%3Crect fill=\'%23ddd\' width=\'200\' height=\'200\'/%3E%3Ctext fill=\'%23999\' font-family=\'sans-serif\' font-size=\'14\' dy=\'10.5\' font-weight=\'bold\' x=\'50%25\' y=\'50%25\' text-anchor=\'middle\'%3ENo Image%3C/text%3E%3C/svg%3E';"
+                         loading="lazy">
+                ` : `
+                    <div class="photo-placeholder">
+                        <i class="fas fa-image"></i>
+                    </div>
+                `}
+            </div>
+            <div class="photo-list-content">
+                <h3>${photo.title || 'Untitled Photo'}</h3>
+                ${photo.description ? `<p class="photo-list-description">${photo.description.length > 150 ? photo.description.substring(0, 150) + '...' : photo.description}</p>` : '<p class="photo-list-description" style="color: var(--text-secondary); font-style: italic;">No description</p>'}
+                <div class="photo-list-meta">
+                    <span><i class="fas fa-calendar"></i> ${photoDate}</span>
+                    <span><i class="fas fa-link"></i> ${isBase64 ? 'Base64 Image' : 'External URL'}</span>
+                    ${photo.alt ? `<span><i class="fas fa-tag"></i> Alt: ${photo.alt}</span>` : ''}
+                </div>
+            </div>
+            <div class="photo-list-actions">
+                <button class="btn btn-secondary btn-sm" onclick="viewPhotoDetails(${originalIndex})" title="View Details">
+                    <i class="fas fa-eye"></i> View More
+                </button>
+                <button class="btn btn-primary btn-sm" onclick="editPhoto(${originalIndex})" title="Edit Photo">
+                    <i class="fas fa-edit"></i> Edit
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="deletePhoto(${originalIndex})" title="Delete Photo">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+            </div>
+        </div>
+        `;
+    }).join('');
+}
+
+document.getElementById('photo-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    
+    const form = document.getElementById('photo-form');
+    const editingIndex = form.getAttribute('data-editing-index');
+    
+    const photoFile = document.getElementById('photo-file').files[0];
+    let photoUrl = document.getElementById('photo-url').value;
+    
+    // Handle local file upload
+    if (photoFile && !photoUrl) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            photoUrl = e.target.result;
+            if (editingIndex !== null) {
+                updatePhoto(parseInt(editingIndex), photoUrl);
+            } else {
+                savePhoto(photoUrl);
+            }
+        };
+        reader.onerror = () => {
+            showAlert('photo-alert', '❌ Error reading file. Please try again.', 'error');
+        };
+        reader.readAsDataURL(photoFile);
+    } else if (!photoUrl && editingIndex === null) {
+        // Only require URL for new photos, not when editing (keep existing URL)
+        showAlert('photo-alert', '⚠️ Please provide either a photo URL or upload a file.', 'error');
+        return;
+    } else {
+        if (editingIndex !== null) {
+            updatePhoto(parseInt(editingIndex), photoUrl);
+        } else {
+            savePhoto(photoUrl);
+        }
+    }
+});
+
+function updatePhoto(index, photoUrl) {
+    try {
+        const photos = JSON.parse(localStorage.getItem('admin-photos') || '[]');
+        const existingPhoto = photos[index];
+        
+        if (!existingPhoto) {
+            showAlert('photo-alert', '❌ Photo not found.', 'error');
+            return;
+        }
+        
+        // Update photo data
+        const updatedPhoto = {
+            ...existingPhoto,
+            title: document.getElementById('photo-title').value,
+            description: document.getElementById('photo-description').value,
+            alt: document.getElementById('photo-alt').value || document.getElementById('photo-title').value,
+            updatedAt: new Date().toISOString()
+        };
+        
+        // Only update URL if a new one was provided
+        if (photoUrl) {
+            updatedPhoto.url = photoUrl;
+        }
+        
+        photos[index] = updatedPhoto;
+        localStorage.setItem('admin-photos', JSON.stringify(photos));
+        
+        showAlert('photo-alert', '✅ Photo updated successfully!', 'success');
+        
+        // Trigger real-time update event
+        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'photos' } }));
+        
+        // Reset form
+        document.getElementById('photo-form').reset();
+        document.getElementById('photo-form').removeAttribute('data-editing-index');
+        const submitBtn = document.querySelector('#photo-form button[type="submit"]');
+        const originalHTML = submitBtn.getAttribute('data-original-html') || '<i class="fas fa-upload"></i> Add Photo';
+        submitBtn.innerHTML = originalHTML;
+        submitBtn.removeAttribute('data-original-html');
+        
+        loadPhotos();
+        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'photos' } }));
+        
+    } catch (error) {
+        console.error('Error updating photo:', error);
+        showAlert('photo-alert', '❌ Error updating photo. Please try again.', 'error');
+    }
+}
+
+function savePhoto(photoUrl) {
+    try {
+        const photo = {
+            id: Date.now() + Math.random(), // Ensure unique ID
+            title: document.getElementById('photo-title').value,
+            description: document.getElementById('photo-description').value,
+            url: photoUrl,
+            alt: document.getElementById('photo-alt').value || document.getElementById('photo-title').value,
+            date: new Date().toISOString()
+        };
+        
+        console.log('Saving photo:', photo);
+        
+        // Get existing photos
+        let photos = [];
+        try {
+            const stored = localStorage.getItem('admin-photos');
+            if (stored) {
+                photos = JSON.parse(stored);
+            }
+        } catch (e) {
+            console.warn('Error parsing existing photos, starting fresh:', e);
+            photos = [];
+        }
+        
+        // Add new photo
+        photos.push(photo);
+        
+        // Save to localStorage
+        try {
+            localStorage.setItem('admin-photos', JSON.stringify(photos));
+            
+            // Verify it was saved
+            const verify = localStorage.getItem('admin-photos');
+            if (!verify) {
+                throw new Error('Failed to save to localStorage');
+            }
+            
+            const parsedVerify = JSON.parse(verify);
+            console.log('✅ Photo saved to localStorage. Total photos:', photos.length);
+            console.log('✅ Verification - localStorage now contains:', parsedVerify.length, 'photos');
+            
+            // Trigger real-time update event
+            window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'photos' } }));
+            
+            // Log photo info without full base64
+            const photoInfo = {
+                id: photo.id,
+                title: photo.title,
+                urlLength: photo.url.length,
+                urlType: photo.url.startsWith('data:') ? 'base64' : 'url',
+                urlPreview: photo.url.substring(0, 50) + '...'
+            };
+            console.log('✅ Saved photo details:', photoInfo);
+            
+        } catch (e) {
+            console.error('Error writing to localStorage:', e);
+            if (e.name === 'QuotaExceededError') {
+                showAlert('photo-alert', '❌ Storage quota exceeded. Please clear some data and try again.', 'error');
+                return;
+            }
+            throw e;
+        }
+        
+        showAlert('photo-alert', '✅ Photo added successfully! It will appear on the Gallery page. <a href="gallery.html" target="_blank" style="color: inherit; text-decoration: underline;">View Gallery</a>', 'success');
+        document.getElementById('photo-form').reset();
+        document.getElementById('photo-form').removeAttribute('data-editing-index');
+        const submitBtn = document.querySelector('#photo-form button[type="submit"]');
+        if (submitBtn.getAttribute('data-original-html')) {
+            const originalHTML = submitBtn.getAttribute('data-original-html');
+            submitBtn.innerHTML = originalHTML;
+            submitBtn.removeAttribute('data-original-html');
+        }
+        loadPhotos();
+        
+        // Trigger custom event for same-tab updates
+        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'photos' } }));
+        
+        // Also trigger storage event simulation for cross-tab
+        window.dispatchEvent(new CustomEvent('photos-updated', { detail: { count: photos.length } }));
+        
+    } catch (error) {
+        console.error('❌ Error saving photo:', error);
+        showAlert('photo-alert', '❌ Error saving photo. Please try again.', 'error');
+    }
+}
+
+function viewPhotoDetails(index) {
+    const photos = JSON.parse(localStorage.getItem('admin-photos') || '[]');
+    const photo = photos[index];
+    
+    if (!photo) {
+        showAlert('photo-alert', '❌ Photo not found.', 'error');
+        return;
+    }
+    
+    // Create or get modal
+    let modal = document.getElementById('photo-details-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'photo-details-modal';
+        modal.className = 'photo-details-modal';
+        modal.innerHTML = `
+            <div class="photo-details-modal-overlay"></div>
+            <div class="photo-details-modal-content">
+                <div class="photo-details-modal-header">
+                    <h2>Photo Details</h2>
+                    <button class="photo-details-modal-close" aria-label="Close">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="photo-details-modal-body" id="photo-details-body">
+                    <!-- Content will be inserted here -->
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        // Close handlers
+        const overlay = modal.querySelector('.photo-details-modal-overlay');
+        const closeBtn = modal.querySelector('.photo-details-modal-close');
+        
+        const closeModal = () => {
+            modal.classList.remove('active');
+            document.body.style.overflow = '';
+        };
+        
+        overlay.addEventListener('click', closeModal);
+        closeBtn.addEventListener('click', closeModal);
+        
+        // Close on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modal.classList.contains('active')) {
+                closeModal();
+            }
+        });
+    }
+    
+    // Populate modal content
+    const body = document.getElementById('photo-details-body');
+    const photoDate = photo.date ? new Date(photo.date).toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    }) : 'Unknown date';
+    
+    body.innerHTML = `
+        <div class="photo-details-image">
+            ${photo.url ? `
+                <img src="${photo.url}" alt="${photo.alt || photo.title || 'Photo'}" 
+                     onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'300\'%3E%3Crect fill=\'%23ddd\' width=\'400\' height=\'300\'/%3E%3Ctext fill=\'%23999\' font-family=\'sans-serif\' font-size=\'18\' dy=\'10.5\' font-weight=\'bold\' x=\'50%25\' y=\'50%25\' text-anchor=\'middle\'%3EImage Not Available%3C/text%3E%3C/svg%3E';">
+            ` : '<div class="photo-placeholder-large"><i class="fas fa-image"></i> No Image</div>'}
+        </div>
+        <div class="photo-details-info">
+            <div class="photo-details-field">
+                <label>Title:</label>
+                <p>${photo.title || 'Untitled Photo'}</p>
+            </div>
+            ${photo.description ? `
+                <div class="photo-details-field">
+                    <label>Description:</label>
+                    <p>${photo.description}</p>
+                </div>
+            ` : ''}
+            ${photo.alt ? `
+                <div class="photo-details-field">
+                    <label>Alt Text:</label>
+                    <p>${photo.alt}</p>
+                </div>
+            ` : ''}
+            <div class="photo-details-field">
+                <label>Uploaded:</label>
+                <p>${photoDate}</p>
+            </div>
+            <div class="photo-details-field">
+                <label>Image Type:</label>
+                <p>${photo.url && photo.url.startsWith('data:image/') ? 'Base64 Encoded Image' : 'External URL'}</p>
+            </div>
+            <div class="photo-details-field">
+                <label>URL:</label>
+                <p class="photo-details-url">
+                    ${photo.url && photo.url.length > 100 ? photo.url.substring(0, 100) + '...' : (photo.url || 'No URL')}
+                    ${photo.url ? `<button class="btn btn-sm btn-secondary" onclick="navigator.clipboard.writeText('${photo.url.replace(/'/g, "\\'")}'); showAlert('photo-alert', '✅ URL copied to clipboard!', 'success');" title="Copy URL"><i class="fas fa-copy"></i> Copy</button>` : ''}
+                </p>
+            </div>
+        </div>
+    `;
+    
+    // Show modal
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function editPhoto(index) {
+    const photos = JSON.parse(localStorage.getItem('admin-photos') || '[]');
+    const photo = photos[index];
+    
+    if (!photo) {
+        showAlert('photo-alert', '❌ Photo not found.', 'error');
+        return;
+    }
+    
+    // Populate form with photo data
+    document.getElementById('photo-title').value = photo.title || '';
+    document.getElementById('photo-description').value = photo.description || '';
+    document.getElementById('photo-url').value = photo.url && !photo.url.startsWith('data:image/') ? photo.url : '';
+    document.getElementById('photo-alt').value = photo.alt || '';
+    document.getElementById('photo-file').value = ''; // Clear file input
+    
+    // Store the index being edited
+    const form = document.getElementById('photo-form');
+    form.setAttribute('data-editing-index', index);
+    
+    // Change submit button text
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalHTML = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-save"></i> Update Photo';
+    submitBtn.setAttribute('data-original-html', originalHTML);
+    
+    // Scroll to form
+    form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    
+    showAlert('photo-alert', '📝 Editing photo. Update the fields and click "Update Photo" to save changes.', 'info');
+}
+
+function deletePhoto(index) {
+    const photos = JSON.parse(localStorage.getItem('admin-photos') || '[]');
+    const photo = photos[index];
+    
+    if (!photo) {
+        showAlert('photo-alert', '❌ Photo not found.', 'error');
+        return;
+    }
+    
+    if (confirm(`Are you sure you want to delete "${photo.title || 'this photo'}"? This action cannot be undone.`)) {
+        photos.splice(index, 1);
+        localStorage.setItem('admin-photos', JSON.stringify(photos));
+        loadPhotos();
+        showAlert('photo-alert', '✅ Photo deleted successfully.', 'success');
+        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'photos' } }));
+    }
+}
+
+// Videos Management
+function loadVideos(searchTerm = '') {
+    const videos = JSON.parse(localStorage.getItem('admin-videos') || '[]');
+    const list = document.getElementById('videos-list');
+    
+    // Filter videos if search term provided
+    let filteredVideos = videos;
+    if (searchTerm.trim()) {
+        const searchLower = searchTerm.toLowerCase();
+        filteredVideos = videos.filter(video => 
+            (video.title && video.title.toLowerCase().includes(searchLower)) ||
+            (video.description && video.description.toLowerCase().includes(searchLower)) ||
+            (video.url && video.url.toLowerCase().includes(searchLower))
+        );
+    }
+    
+    if (filteredVideos.length === 0) {
+        list.innerHTML = searchTerm.trim()
+            ? `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No videos found matching "${searchTerm}"</p>`
+            : '<p>No videos added yet. Add one above!</p>';
+        return;
+    }
+    
+    list.innerHTML = filteredVideos.map((video, displayIndex) => {
+        // Find original index for edit/delete functions
+        const originalIndex = videos.findIndex(v => v.id === video.id);
+        return `
+        <div class="item-card">
+            <div class="item-card-content">
+                <h3>${video.title}</h3>
+                ${video.description ? `<p>${video.description}</p>` : ''}
+                <p><strong>URL:</strong> <a href="${video.url}" target="_blank">${video.url}</a></p>
+            </div>
+            <div class="item-card-actions">
+                <button class="btn btn-danger" onclick="deleteVideo(${originalIndex})">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+            </div>
+        </div>
+    `;
+    }).join('');
+}
+
+document.getElementById('video-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    
+    const video = {
+        id: Date.now(),
+        title: document.getElementById('video-title').value,
+        description: document.getElementById('video-description').value,
+        url: document.getElementById('video-url').value,
+        thumbnail: document.getElementById('video-thumbnail').value,
+        date: new Date().toISOString()
+    };
+    
+    const videos = JSON.parse(localStorage.getItem('admin-videos') || '[]');
+    videos.push(video);
+    localStorage.setItem('admin-videos', JSON.stringify(videos));
+    
+    showAlert('video-alert', '✅ Video added successfully! It will appear on the Video Gallery page. <a href="video.html" target="_blank" style="color: inherit; text-decoration: underline;">View Videos</a>', 'success');
+    document.getElementById('video-form').reset();
+    loadVideos();
+    
+    // Trigger real-time update event
+    window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'videos' } }));
+    
+    // Trigger custom event for same-tab updates
+    window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'videos' } }));
+});
+
+function deleteVideo(index) {
+    if (confirm('Are you sure you want to delete this video?')) {
+        const videos = JSON.parse(localStorage.getItem('admin-videos') || '[]');
+        videos.splice(index, 1);
+        localStorage.setItem('admin-videos', JSON.stringify(videos));
+        loadVideos();
+        
+        // Trigger real-time update event
+        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'videos' } }));
+    }
+}
+
+// Comments Management
+function loadComments(searchTerm = '') {
+    const allComments = [];
+    
+    // Get comments from all testimonials
+    for (let i = 1; i <= 10; i++) {
+        const comments = JSON.parse(localStorage.getItem(`testimonial-comments-${i}`) || '[]');
+        comments.forEach(comment => {
+            allComments.push({
+                ...comment,
+                testimonialId: i
+            });
+        });
+    }
+    
+    // Filter comments if search term provided
+    let filteredComments = allComments;
+    if (searchTerm.trim()) {
+        const searchLower = searchTerm.toLowerCase();
+        filteredComments = allComments.filter(comment => 
+            (comment.author && comment.author.toLowerCase().includes(searchLower)) ||
+            (comment.email && comment.email.toLowerCase().includes(searchLower)) ||
+            (comment.text && comment.text.toLowerCase().includes(searchLower))
+        );
+    }
+    
+    const list = document.getElementById('comments-list');
+    
+    if (filteredComments.length === 0) {
+        list.innerHTML = searchTerm.trim()
+            ? `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No comments found matching "${searchTerm}"</p>`
+            : '<p>No comments yet.</p>';
+        return;
+    }
+    
+    list.innerHTML = filteredComments.map((comment, index) => `
+        <div class="item-card">
+            <div class="item-card-content">
+                <h3>${comment.author}</h3>
+                <p>${comment.text}</p>
+                <p><strong>Time:</strong> ${comment.time} | <strong>Testimonial ID:</strong> ${comment.testimonialId}</p>
+            </div>
+            <div class="item-card-actions">
+                <button class="btn btn-danger" onclick="deleteComment(${comment.testimonialId}, ${comment.id})">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function deleteComment(testimonialId, commentId) {
+    if (confirm('Are you sure you want to delete this comment?')) {
+        const comments = JSON.parse(localStorage.getItem(`testimonial-comments-${testimonialId}`) || '[]');
+        const filtered = comments.filter(c => c.id !== commentId);
+        localStorage.setItem(`testimonial-comments-${testimonialId}`, JSON.stringify(filtered));
+        loadComments();
+    }
+}
+
+// Utility Functions
+function showAlert(containerId, message, type) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+    setTimeout(() => {
+        container.innerHTML = '';
+    }, 5000); // Increased timeout to allow clicking the link
+}
+
+// Pending Stories Management
+function loadPendingStories(searchTerm = '') {
+    console.log('Loading pending stories...');
+    const pendingStories = JSON.parse(localStorage.getItem('pending-stories') || '[]');
+    console.log('Found pending stories:', pendingStories.length, pendingStories);
+    const list = document.getElementById('pending-stories-list');
+    
+    if (!list) {
+        console.error('pending-stories-list element not found!');
+        return;
+    }
+    
+    const pendingCount = pendingStories.filter(s => s.status === 'pending').length;
+    const countElement = document.getElementById('pending-count');
+    if (countElement) {
+        countElement.textContent = pendingCount;
+    }
+    
+    // Filter stories if search term provided
+    let filteredStories = pendingStories;
+    if (searchTerm.trim()) {
+        const searchLower = searchTerm.toLowerCase();
+        filteredStories = pendingStories.filter(story => 
+            (story.name && story.name.toLowerCase().includes(searchLower)) ||
+            (story.email && story.email.toLowerCase().includes(searchLower)) ||
+            (story.storyTitle && story.storyTitle.toLowerCase().includes(searchLower)) ||
+            (story.story && story.story.toLowerCase().includes(searchLower)) ||
+            (story.location && story.location.toLowerCase().includes(searchLower))
+        );
+    }
+    
+    if (filteredStories.length === 0) {
+        list.innerHTML = searchTerm.trim()
+            ? `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No stories found matching "${searchTerm}"</p>`
+            : '<p style="text-align: center; color: var(--text-secondary);">No pending story submissions.</p>';
+        return;
+    }
+    
+    // Filter to show only pending stories first, then others
+    const sortedStories = [...filteredStories].sort((a, b) => {
+        if (a.status === 'pending' && b.status !== 'pending') return -1;
+        if (a.status !== 'pending' && b.status === 'pending') return 1;
+        return new Date(b.submittedAt) - new Date(a.submittedAt);
+    });
+    
+    if (sortedStories.length === 0) {
+        list.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">No pending story submissions.</p>';
+        return;
+    }
+    
+    list.innerHTML = sortedStories.map((story, index) => {
+        // Find original index for approve/reject functions
+        const originalIndex = pendingStories.findIndex(s => s.id === story.id);
+        return `
+        <div class="item-card" style="border-left: 4px solid ${story.status === 'pending' ? '#f59e0b' : story.status === 'approved' ? '#10b981' : '#ef4444'};">
+            <div class="item-card-content">
+                <h3>${story.storyTitle || 'Untitled Story'}</h3>
+                <p><strong>By:</strong> ${story.name} ${story.email ? `(${story.email})` : ''}</p>
+                ${story.location ? `<p><strong>Location:</strong> ${story.location}</p>` : ''}
+                <p><strong>Program:</strong> ${story.program || 'N/A'}</p>
+                <p><strong>Submitted:</strong> ${new Date(story.submittedAt).toLocaleDateString()}</p>
+                <p><strong>Status:</strong> <span style="text-transform: capitalize; color: ${story.status === 'pending' ? '#f59e0b' : story.status === 'approved' ? '#10b981' : '#ef4444'};">${story.status}</span></p>
+                <details style="margin-top: 1rem;">
+                    <summary style="cursor: pointer; color: var(--primary-blue); font-weight: 600;">View Story</summary>
+                    <div style="margin-top: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: 8px;">
+                        <p>${story.story}</p>
+                        ${story.imageUrl ? `<img src="${story.imageUrl}" alt="Story image" style="max-width: 100%; margin-top: 1rem; border-radius: 8px;">` : ''}
+                    </div>
+                </details>
+            </div>
+            <div class="item-card-actions">
+                ${story.status === 'pending' ? `
+                    <button class="btn btn-primary" onclick="approveStory(${originalIndex})">
+                        <i class="fas fa-check"></i> Approve & Post
+                    </button>
+                    <button class="btn btn-danger" onclick="rejectStory(${originalIndex})">
+                        <i class="fas fa-times"></i> Reject
+                    </button>
+                ` : ''}
+                <button class="btn btn-secondary" onclick="deletePendingStory(${originalIndex})">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+            </div>
+        </div>
+    `;
+    }).join('');
+}
+
+function approveStory(index) {
+    const pendingStories = JSON.parse(localStorage.getItem('pending-stories') || '[]');
+    const story = pendingStories[index];
+    
+    // Convert to testimonial format
+    const testimonial = {
+        id: story.id,
+        name: story.name,
+        role: story.program || 'Community Member',
+        quote: story.story,
+        tags: story.program || 'Stories of Transformation',
+        date: new Date().toISOString()
+    };
+    
+    // Add to testimonials
+    const testimonials = JSON.parse(localStorage.getItem('admin-testimonials') || '[]');
+    testimonials.push(testimonial);
+    localStorage.setItem('admin-testimonials', JSON.stringify(testimonials));
+    
+    // Update story status
+    story.status = 'approved';
+    story.approvedAt = new Date().toISOString();
+    pendingStories[index] = story;
+    localStorage.setItem('pending-stories', JSON.stringify(pendingStories));
+    
+    showAlert('testimonial-alert', '✅ Story approved and posted! <a href="impact.html" target="_blank" style="color: inherit; text-decoration: underline;">View on Impact Page</a>', 'success');
+    loadPendingStories();
+    window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'testimonials' } }));
+}
+
+function rejectStory(index) {
+    if (confirm('Are you sure you want to reject this story?')) {
+        const pendingStories = JSON.parse(localStorage.getItem('pending-stories') || '[]');
+        pendingStories[index].status = 'rejected';
+        pendingStories[index].rejectedAt = new Date().toISOString();
+        localStorage.setItem('pending-stories', JSON.stringify(pendingStories));
+        loadPendingStories();
+    }
+}
+
+function deletePendingStory(index) {
+    if (confirm('Are you sure you want to delete this story submission?')) {
+        const pendingStories = JSON.parse(localStorage.getItem('pending-stories') || '[]');
+        pendingStories.splice(index, 1);
+        localStorage.setItem('pending-stories', JSON.stringify(pendingStories));
+        loadPendingStories();
+    }
+}
+
+// Events Management
+function loadEvents(searchTerm = '') {
+    const events = JSON.parse(localStorage.getItem('admin-events') || '[]');
+    const list = document.getElementById('events-list');
+    
+    // Filter events if search term provided
+    let filteredEvents = events;
+    if (searchTerm.trim()) {
+        const searchLower = searchTerm.toLowerCase();
+        filteredEvents = events.filter(event => 
+            (event.title && event.title.toLowerCase().includes(searchLower)) ||
+            (event.description && event.description.toLowerCase().includes(searchLower)) ||
+            (event.location && event.location.toLowerCase().includes(searchLower)) ||
+            (event.venue && event.venue.toLowerCase().includes(searchLower))
+        );
+    }
+    
+    if (filteredEvents.length === 0) {
+        list.innerHTML = searchTerm.trim()
+            ? `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No events found matching "${searchTerm}"</p>`
+            : '<p>No events created yet. Create one above!</p>';
+        return;
+    }
+    
+    // Sort by date
+    filteredEvents.sort((a, b) => new Date(a.date) - new Date(b.date));
+    
+    list.innerHTML = filteredEvents.map((event, displayIndex) => {
+        // Find original index for edit/delete functions
+        const originalIndex = events.findIndex(e => e.id === event.id);
+        return `
+        <div class="item-card">
+            <div class="item-card-content">
+                <h3>${event.title}</h3>
+                <p><strong>Date:</strong> ${new Date(event.date).toLocaleDateString()} ${event.time ? `at ${event.time}` : ''}</p>
+                <p><strong>Location:</strong> ${event.location}</p>
+                ${event.venue ? `<p><strong>Venue:</strong> ${event.venue}</p>` : ''}
+                <p>${event.description}</p>
+                ${event.contactName ? `<p><strong>Contact:</strong> ${event.contactName} ${event.contactEmail ? `(${event.contactEmail})` : ''} ${event.contactPhone ? `- ${event.contactPhone}` : ''}</p>` : ''}
+                ${event.featured ? '<span style="background: #f59e0b; color: white; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">Featured on Homepage</span>' : ''}
+            </div>
+            <div class="item-card-actions">
+                ${new Date(event.date) >= new Date() ? `
+                    <button class="btn btn-info" onclick="viewEventRegistrants('${event.id}')" title="View Registrants">
+                        <i class="fas fa-users"></i> View Registrants
+                    </button>
+                ` : ''}
+                <button class="btn btn-secondary" onclick="editEvent(${originalIndex})">
+                    <i class="fas fa-edit"></i> Edit
+                </button>
+                <button class="btn btn-danger" onclick="deleteEvent(${originalIndex})">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+            </div>
+        </div>
+    `;
+    }).join('');
+}
+
+// Initialize event form handlers when DOM is ready
+function initEventFormHandlers() {
+    // Document preview handler
+    const eventDocumentsInput = document.getElementById('event-documents');
+    if (eventDocumentsInput && !eventDocumentsInput.hasAttribute('data-listener-attached')) {
+        eventDocumentsInput.setAttribute('data-listener-attached', 'true');
+        eventDocumentsInput.addEventListener('change', (e) => {
+            const files = e.target.files;
+            const previewDiv = document.getElementById('event-documents-preview');
+            if (previewDiv) {
+                if (files.length > 0) {
+                    let previewHTML = `<div style="margin-top: 0.5rem; padding: 0.75rem; background: var(--light-gray); border-radius: 6px;"><strong>Selected Files (${files.length}):</strong><ul style="margin: 0.5rem 0 0 0; padding-left: 1.5rem;">`;
+                    Array.from(files).forEach(file => {
+                        const fileSize = (file.size / 1024).toFixed(2) + ' KB';
+                        previewHTML += `<li>${file.name} <small style="color: var(--text-secondary);">(${fileSize})</small></li>`;
+                    });
+                    previewHTML += '</ul></div>';
+                    previewDiv.innerHTML = previewHTML;
+                } else {
+                    previewDiv.innerHTML = '';
+                }
+            }
+        });
+    }
+
+    // Event form submit handler
+    const eventForm = document.getElementById('event-form');
+    if (eventForm && !eventForm.hasAttribute('data-listener-attached')) {
+        eventForm.setAttribute('data-listener-attached', 'true');
+        eventForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            // Check if we're in edit mode
+            const submitBtn = document.querySelector('#event-form button[type="submit"]');
+            if (submitBtn && submitBtn.onclick) {
+                // In edit mode, let the onclick handler handle it
+                return;
+            }
+            
+            const imageFile = document.getElementById('event-image-file');
+            const imageFileValue = imageFile ? imageFile.files[0] : null;
+            let imageUrl = document.getElementById('event-image') ? document.getElementById('event-image').value : '';
+            
+            // Handle local file upload
+            if (imageFileValue && !imageUrl) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    imageUrl = e.target.result;
+                    saveEvent(imageUrl);
+                };
+                reader.readAsDataURL(imageFileValue);
+            } else {
+                saveEvent(imageUrl);
+            }
+        });
+    }
+}
+
+// Initialize when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(initEventFormHandlers, 100);
+    });
+} else {
+    setTimeout(initEventFormHandlers, 100);
+}
+
+// Also initialize when events tab is loaded
+const originalLoadTabContent = loadTabContent;
+loadTabContent = function(tab) {
+    originalLoadTabContent(tab);
+    if (tab === 'events') {
+        setTimeout(initEventFormHandlers, 200); // Small delay to ensure DOM is updated
+    }
+};
+
+function saveEvent(imageUrl) {
+    const maxAttendees = parseInt(document.getElementById('event-max-attendees').value) || 0;
+    const maxOrgAttendees = document.getElementById('event-max-org-attendees').value 
+        ? parseInt(document.getElementById('event-max-org-attendees').value) 
+        : null;
+    
+    // Handle document uploads
+    const documentFiles = document.getElementById('event-documents').files;
+    const documents = [];
+    
+    if (documentFiles.length > 0) {
+        const filePromises = Array.from(documentFiles).map(file => {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    resolve({
+                        name: file.name,
+                        filename: file.name,
+                        data: e.target.result,
+                        url: e.target.result, // For data URLs
+                        size: file.size,
+                        type: file.type
+                    });
+                };
+                reader.readAsDataURL(file);
+            });
+        });
+        
+        Promise.all(filePromises).then(docs => {
+            const event = {
+                id: Date.now(),
+                title: document.getElementById('event-title').value,
+                date: document.getElementById('event-date').value,
+                time: document.getElementById('event-time').value,
+                location: document.getElementById('event-location').value,
+                description: document.getElementById('event-description').value,
+                venue: document.getElementById('event-venue').value,
+                contactName: document.getElementById('event-contact-name').value,
+                contactEmail: document.getElementById('event-contact-email').value,
+                contactPhone: document.getElementById('event-contact-phone').value,
+                image: imageUrl,
+                registrationLink: document.getElementById('event-registration-link').value,
+                featured: document.getElementById('event-featured').checked,
+                maxAttendees: maxAttendees,
+                maxAttendeesPerOrganization: maxOrgAttendees,
+                documents: docs,
+                createdAt: new Date().toISOString()
+            };
+            
+            const events = JSON.parse(localStorage.getItem('admin-events') || '[]');
+            events.push(event);
+            localStorage.setItem('admin-events', JSON.stringify(events));
+            
+            showAlert('event-alert', '✅ Event created successfully!', 'success');
+            document.getElementById('event-form').reset();
+            document.getElementById('event-documents-preview').innerHTML = '';
+            loadEvents();
+            window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'events' } }));
+        });
+    } else {
+        const event = {
+            id: Date.now(),
+            title: document.getElementById('event-title').value,
+            date: document.getElementById('event-date').value,
+            time: document.getElementById('event-time').value,
+            location: document.getElementById('event-location').value,
+            description: document.getElementById('event-description').value,
+            venue: document.getElementById('event-venue').value,
+            contactName: document.getElementById('event-contact-name').value,
+            contactEmail: document.getElementById('event-contact-email').value,
+            contactPhone: document.getElementById('event-contact-phone').value,
+            image: imageUrl,
+            registrationLink: document.getElementById('event-registration-link').value,
+            featured: document.getElementById('event-featured').checked,
+            maxAttendees: maxAttendees,
+            maxAttendeesPerOrganization: maxOrgAttendees,
+            documents: [],
+            createdAt: new Date().toISOString()
+        };
+        
+        const events = JSON.parse(localStorage.getItem('admin-events') || '[]');
+        events.push(event);
+        localStorage.setItem('admin-events', JSON.stringify(events));
+        
+        showAlert('event-alert', '✅ Event created successfully!', 'success');
+        document.getElementById('event-form').reset();
+        document.getElementById('event-documents-preview').innerHTML = '';
+        loadEvents();
+        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'events' } }));
+    }
+}
+
+function editEvent(index) {
+    const events = JSON.parse(localStorage.getItem('admin-events') || '[]');
+    const event = events[index];
+    
+    if (!event) return;
+    
+    // Populate form
+    document.getElementById('event-title').value = event.title || '';
+    document.getElementById('event-date').value = event.date || '';
+    document.getElementById('event-time').value = event.time || '';
+    document.getElementById('event-location').value = event.location || '';
+    document.getElementById('event-description').value = event.description || '';
+    document.getElementById('event-venue').value = event.venue || '';
+    document.getElementById('event-contact-name').value = event.contactName || '';
+    document.getElementById('event-contact-email').value = event.contactEmail || '';
+    document.getElementById('event-contact-phone').value = event.contactPhone || '';
+    document.getElementById('event-image').value = event.image || '';
+    document.getElementById('event-registration-link').value = event.registrationLink || '';
+    document.getElementById('event-featured').checked = event.featured || false;
+    document.getElementById('event-max-attendees').value = event.maxAttendees || '';
+    document.getElementById('event-max-org-attendees').value = event.maxAttendeesPerOrganization || '';
+    
+    // Display existing documents
+    const previewDiv = document.getElementById('event-documents-preview');
+    if (event.documents && event.documents.length > 0) {
+        previewDiv.innerHTML = `
+            <div style="margin-top: 0.5rem; padding: 0.75rem; background: var(--light-gray); border-radius: 6px;">
+                <strong>Existing Documents (${event.documents.length}):</strong>
+                <ul style="margin: 0.5rem 0 0 0; padding-left: 1.5rem;">
+                    ${event.documents.map(doc => `<li>${doc.name || doc.filename || 'Document'}</li>`).join('')}
+                </ul>
+                <small style="color: var(--text-secondary);">Upload new files to add to existing documents</small>
+            </div>
+        `;
+    } else {
+        previewDiv.innerHTML = '';
+    }
+    
+    // Change submit button text
+    const submitBtn = document.querySelector('#event-form button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.innerHTML = '<i class="fas fa-save"></i> Update Event';
+        submitBtn.onclick = (e) => {
+            e.preventDefault();
+            updateEvent(index);
+        };
+    }
+    
+    // Scroll to form
+    document.getElementById('event-form').scrollIntoView({ behavior: 'smooth' });
+}
+
+function updateEvent(index) {
+    const imageFile = document.getElementById('event-image-file').files[0];
+    let imageUrl = document.getElementById('event-image').value;
+    
+    // Handle local file upload
+    if (imageFile && !imageUrl) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            imageUrl = e.target.result;
+            saveUpdatedEvent(index, imageUrl);
+        };
+        reader.readAsDataURL(imageFile);
+    } else {
+        saveUpdatedEvent(index, imageUrl);
+    }
+}
+
+function saveUpdatedEvent(index, imageUrl) {
+    const maxAttendees = parseInt(document.getElementById('event-max-attendees').value) || 0;
+    const maxOrgAttendees = document.getElementById('event-max-org-attendees').value 
+        ? parseInt(document.getElementById('event-max-org-attendees').value) 
+        : null;
+    
+    const events = JSON.parse(localStorage.getItem('admin-events') || '[]');
+    const event = events[index];
+    
+    event.title = document.getElementById('event-title').value;
+    event.date = document.getElementById('event-date').value;
+    event.time = document.getElementById('event-time').value;
+    event.location = document.getElementById('event-location').value;
+    event.description = document.getElementById('event-description').value;
+    event.venue = document.getElementById('event-venue').value;
+    event.contactName = document.getElementById('event-contact-name').value;
+    event.contactEmail = document.getElementById('event-contact-email').value;
+    event.contactPhone = document.getElementById('event-contact-phone').value;
+    if (imageUrl) event.image = imageUrl;
+    event.registrationLink = document.getElementById('event-registration-link').value;
+    event.featured = document.getElementById('event-featured').checked;
+    event.maxAttendees = maxAttendees;
+    event.maxAttendeesPerOrganization = maxOrgAttendees;
+    
+    // Handle document uploads - preserve existing documents if no new ones uploaded
+    const documentFiles = document.getElementById('event-documents').files;
+    if (documentFiles.length > 0) {
+        const filePromises = Array.from(documentFiles).map(file => {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    resolve({
+                        name: file.name,
+                        filename: file.name,
+                        data: e.target.result,
+                        url: e.target.result,
+                        size: file.size,
+                        type: file.type
+                    });
+                };
+                reader.readAsDataURL(file);
+            });
+        });
+        
+        Promise.all(filePromises).then(docs => {
+            // Merge with existing documents (if any)
+            event.documents = (event.documents || []).concat(docs);
+            event.updatedAt = new Date().toISOString();
+            
+            localStorage.setItem('admin-events', JSON.stringify(events));
+            
+            showAlert('event-alert', '✅ Event updated successfully!', 'success');
+            document.getElementById('event-form').reset();
+            document.getElementById('event-documents-preview').innerHTML = '';
+            
+            // Reset submit button
+            const submitBtn = document.querySelector('#event-form button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.innerHTML = '<i class="fas fa-calendar-plus"></i> Create Event';
+                submitBtn.onclick = null;
+            }
+            
+            loadEvents();
+            window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'events' } }));
+        });
+    } else {
+        // Keep existing documents if no new ones uploaded
+        if (!event.documents) event.documents = [];
+        event.updatedAt = new Date().toISOString();
+        
+        localStorage.setItem('admin-events', JSON.stringify(events));
+        
+        showAlert('event-alert', '✅ Event updated successfully!', 'success');
+        document.getElementById('event-form').reset();
+        document.getElementById('event-documents-preview').innerHTML = '';
+        
+        // Reset submit button
+        const submitBtn = document.querySelector('#event-form button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.innerHTML = '<i class="fas fa-calendar-plus"></i> Create Event';
+            submitBtn.onclick = null;
+        }
+        
+        loadEvents();
+        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'events' } }));
+    }
+}
+
+function deleteEvent(index) {
+    if (confirm('Are you sure you want to delete this event?')) {
+        const events = JSON.parse(localStorage.getItem('admin-events') || '[]');
+        events.splice(index, 1);
+        localStorage.setItem('admin-events', JSON.stringify(events));
+        loadEvents();
+        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'events' } }));
+    }
+}
+
+// Event Registrations Management
+function viewEventRegistrants(eventId) {
+    const registrations = JSON.parse(localStorage.getItem('event-registrations') || '[]');
+    const eventRegistrations = registrations.filter(reg => reg.eventId.toString() === eventId.toString());
+    const events = JSON.parse(localStorage.getItem('admin-events') || '[]');
+    const event = events.find(e => (e.id || '').toString() === eventId.toString());
+    
+    const container = document.getElementById('event-registrations-container');
+    if (!container) return;
+    
+    // Store current event ID for refresh
+    container.setAttribute('data-current-event-id', eventId);
+    
+    if (!event) {
+        container.innerHTML = '<p style="color: var(--error-color);">Event not found.</p>';
+        return;
+    }
+    
+    if (eventRegistrations.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 2rem;">
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">No registrations yet for this event.</p>
+                <p style="color: var(--text-secondary); font-size: 0.9rem;">Event: <strong>${event.title}</strong></p>
+            </div>
+        `;
+        return;
+    }
+    
+    // Calculate total attendees
+    const totalAttendees = eventRegistrations.reduce((sum, reg) => sum + (reg.numberOfAttendees || 1), 0);
+    const maxAttendees = event.maxAttendees || 0;
+    const remainingSlots = maxAttendees > 0 ? Math.max(0, maxAttendees - totalAttendees) : 'Unlimited';
+    
+    container.innerHTML = `
+        <div style="margin-bottom: 1.5rem;">
+            <h3 style="margin-bottom: 0.5rem;">${event.title}</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                Date: ${new Date(event.date).toLocaleDateString()} | 
+                Total Registrations: ${eventRegistrations.length} | 
+                Total Attendees: ${totalAttendees}${maxAttendees > 0 ? ` / ${maxAttendees} (${remainingSlots} remaining)` : ''}
+            </p>
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                <button class="btn btn-success" onclick="exportRegistrantsPDF('${eventId}')">
+                    <i class="fas fa-file-pdf"></i> Export PDF
+                </button>
+                <button class="btn btn-success" onclick="exportRegistrantsExcel('${eventId}')">
+                    <i class="fas fa-file-excel"></i> Export Excel
+                </button>
+                <button class="btn btn-primary" onclick="openBulkEmailModal('${eventId}')" style="background: var(--primary-blue);">
+                    <i class="fas fa-envelope"></i> Send Invitation Emails
+                </button>
+                <button class="btn btn-primary" onclick="openBulkEmailModal('${eventId}')" style="background: var(--primary-blue);">
+                    <i class="fas fa-envelope"></i> Send Invitation Emails
+                </button>
+            </div>
+        </div>
+        <div style="overflow-x: auto;">
+            <table class="registrants-table" style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: var(--bg-secondary);">
+                        <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid var(--border-color);">#</th>
+                        <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid var(--border-color);">Name/Organization</th>
+                        <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid var(--border-color);">Type</th>
+                        <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid var(--border-color);">Email</th>
+                        <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid var(--border-color);">Phone</th>
+                        <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid var(--border-color);">Attendees</th>
+                        <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid var(--border-color);">Attendee Details</th>
+                        <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid var(--border-color);">Registered</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${eventRegistrations.map((reg, index) => {
+                        const attendeeDetails = reg.attendeeDetails || [];
+                        const hasDetails = attendeeDetails.length > 0;
+                        return `
+                        <tr style="border-bottom: 1px solid var(--border-color);">
+                            <td style="padding: 0.75rem;">${index + 1}</td>
+                            <td style="padding: 0.75rem;">
+                                ${reg.registrationType === 'organization' ? `<strong>${reg.organizationName || 'N/A'}</strong><br><small>Contact: ${reg.name || 'N/A'}</small>` : reg.name || 'N/A'}
+                            </td>
+                            <td style="padding: 0.75rem; text-transform: capitalize;">${reg.registrationType || 'individual'}</td>
+                            <td style="padding: 0.75rem;"><a href="mailto:${reg.email}">${reg.email}</a></td>
+                            <td style="padding: 0.75rem;"><a href="tel:${reg.phone}">${reg.phone}</a></td>
+                            <td style="padding: 0.75rem;">${reg.numberOfAttendees || 1}</td>
+                            <td style="padding: 0.75rem;">
+                                ${hasDetails ? `
+                                    <button class="btn btn-sm btn-info" onclick="viewAttendeeDetails(${reg.id})" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">
+                                        <i class="fas fa-eye"></i> View (${attendeeDetails.length})
+                                    </button>
+                                ` : '<span style="color: var(--text-secondary);">No details</span>'}
+                            </td>
+                            <td style="padding: 0.75rem;">${new Date(reg.registrationDate).toLocaleDateString()}</td>
+                        </tr>
+                    `;
+                    }).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function exportRegistrantsPDF(eventId) {
+    const registrations = JSON.parse(localStorage.getItem('event-registrations') || '[]');
+    const eventRegistrations = registrations.filter(reg => reg.eventId.toString() === eventId.toString());
+    const events = JSON.parse(localStorage.getItem('admin-events') || '[]');
+    const event = events.find(e => (e.id || '').toString() === eventId.toString());
+    
+    if (!event || eventRegistrations.length === 0) {
+        alert('No registrations to export.');
+        return;
+    }
+    
+    // Create PDF content
+    let pdfContent = `
+        <html>
+        <head>
+            <title>Event Registrants - ${event.title}</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; }
+                h1 { color: #2563eb; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background-color: #2563eb; color: white; }
+            </style>
+        </head>
+        <body>
+            <h1>${event.title}</h1>
+            <p><strong>Event Date:</strong> ${new Date(event.date).toLocaleDateString()}</p>
+            <p><strong>Location:</strong> ${event.location}</p>
+            <p><strong>Total Registrations:</strong> ${eventRegistrations.length}</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Name/Organization</th>
+                        <th>Type</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Attendees</th>
+                        <th>Registered</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    eventRegistrations.forEach((reg, index) => {
+        pdfContent += `
+            <tr>
+                <td>${index + 1}</td>
+                <td>${reg.registrationType === 'organization' ? `${reg.organizationName || 'N/A'} (Contact: ${reg.name || 'N/A'})` : reg.name || 'N/A'}</td>
+                <td>${reg.registrationType || 'individual'}</td>
+                <td>${reg.email}</td>
+                <td>${reg.phone}</td>
+                <td>${reg.numberOfAttendees || 1}</td>
+                <td>${new Date(reg.registrationDate).toLocaleDateString()}</td>
+            </tr>
+        `;
+    });
+    
+    pdfContent += `
+                </tbody>
+            </table>
+        </body>
+        </html>
+    `;
+    
+    // Open print dialog
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(pdfContent);
+    printWindow.document.close();
+    printWindow.print();
+}
+
+function exportRegistrantsExcel(eventId) {
+    const registrations = JSON.parse(localStorage.getItem('event-registrations') || '[]');
+    const eventRegistrations = registrations.filter(reg => reg.eventId.toString() === eventId.toString());
+    const events = JSON.parse(localStorage.getItem('admin-events') || '[]');
+    const event = events.find(e => (e.id || '').toString() === eventId.toString());
+    
+    if (!event || eventRegistrations.length === 0) {
+        alert('No registrations to export.');
+        return;
+    }
+    
+    // Create CSV content
+    let csvContent = `Event: ${event.title}\n`;
+    csvContent += `Event Date: ${new Date(event.date).toLocaleDateString()}\n`;
+    csvContent += `Location: ${event.location}\n`;
+    csvContent += `Total Registrations: ${eventRegistrations.length}\n\n`;
+    
+    csvContent += `#,Name/Organization,Type,Email,Phone,Address,Attendees,Registered Date,Additional Notes\n`;
+    
+    eventRegistrations.forEach((reg, index) => {
+        const name = reg.registrationType === 'organization' 
+            ? `${reg.organizationName || 'N/A'} (Contact: ${reg.name || 'N/A'})` 
+            : reg.name || 'N/A';
+        const email = reg.email || '';
+        const phone = reg.phone || '';
+        const address = (reg.address || '').replace(/,/g, ';');
+        const notes = (reg.additionalNotes || '').replace(/,/g, ';');
+        const registered = new Date(reg.registrationDate).toLocaleDateString();
+        
+        csvContent += `${index + 1},"${name}",${reg.registrationType || 'individual'},"${email}","${phone}","${address}",${reg.numberOfAttendees || 1},"${registered}","${notes}"\n`;
+    });
+    
+    // Create download link
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `event-registrants-${event.title.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${Date.now()}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// Helper function to clean contact information from Excel formatting
+function cleanContactInfo(value) {
+    if (!value) return null;
+    // Convert to string and trim
+    let cleaned = String(value).trim();
+    // Remove Excel date formatting artifacts (e.g., "44562" becomes empty)
+    // Remove any non-printable characters
+    cleaned = cleaned.replace(/[\x00-\x1F\x7F-\x9F]/g, '');
+    // Remove leading/trailing quotes
+    cleaned = cleaned.replace(/^["']|["']$/g, '');
+    // For emails, ensure it's a valid format
+    if (cleaned.includes('@')) {
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(cleaned)) {
+            return null; // Invalid email format
+        }
+    }
+    // For phones, remove any non-digit characters except +, spaces, hyphens, parentheses
+    if (!cleaned.includes('@')) {
+        cleaned = cleaned.replace(/[^\d+\s\-()]/g, '');
+    }
+    return cleaned || null;
+}
+
+function viewAttendeeDetails(registrationId) {
+    const registrations = JSON.parse(localStorage.getItem('event-registrations') || '[]');
+    const registration = registrations.find(r => r.id === registrationId);
+    
+    if (!registration || !registration.attendeeDetails || registration.attendeeDetails.length === 0) {
+        alert('No attendee details available.');
+        return;
+    }
+    
+    // Store the current event ID to refresh the view after closing
+    const container = document.getElementById('event-registrations-container');
+    const currentEventId = container ? container.getAttribute('data-current-event-id') : null;
+    
+    let detailsHTML = `
+        <div style="max-width: 800px; margin: 0 auto;">
+            <h3 style="margin-bottom: 1rem; color: var(--navy-blue);">Attendee Details</h3>
+            <p style="margin-bottom: 1.5rem;"><strong>Registration:</strong> ${registration.registrationType === 'organization' ? registration.organizationName : registration.name}</p>
+            <table class="registrants-table" style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
+                <thead>
+                    <tr style="background: var(--bg-secondary);">
+                        <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid var(--border-color);">#</th>
+                        <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid var(--border-color);">Name</th>
+                        <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid var(--border-color);">Position</th>
+                        <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid var(--border-color);">Email</th>
+                        <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid var(--border-color);">Phone</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    registration.attendeeDetails.forEach((attendee, index) => {
+        // Clean contact information
+        const cleanEmail = cleanContactInfo(attendee.email);
+        const cleanPhone = cleanContactInfo(attendee.phone);
+        
+        detailsHTML += `
+            <tr style="border-bottom: 1px solid var(--border-color);">
+                <td style="padding: 0.75rem;">${index + 1}</td>
+                <td style="padding: 0.75rem;">${attendee.name || 'N/A'}</td>
+                <td style="padding: 0.75rem;">${attendee.position || 'N/A'}</td>
+                <td style="padding: 0.75rem;">
+                    ${cleanEmail ? `<a href="mailto:${cleanEmail}" style="color: var(--primary-blue); text-decoration: none;">${cleanEmail}</a>` : '<span style="color: var(--text-secondary);">N/A</span>'}
+                </td>
+                <td style="padding: 0.75rem;">
+                    ${cleanPhone ? `<a href="tel:${cleanPhone.replace(/[\s\-()]/g, '')}" style="color: var(--primary-blue); text-decoration: none;">${cleanPhone}</a>` : '<span style="color: var(--text-secondary);">N/A</span>'}
+                </td>
+            </tr>
+        `;
+    });
+    
+    detailsHTML += `
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    // Create modal with proper close handler
+    const modal = document.createElement('div');
+    modal.id = 'attendee-details-modal';
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 3000; display: flex; align-items: center; justify-content: center;';
+    modal.innerHTML = `
+        <div style="background: var(--bg-primary); padding: 2rem; border-radius: 16px; max-width: 900px; width: 90%; max-height: 90vh; overflow-y: auto; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.3);">
+            <button id="close-attendee-modal" style="position: absolute; top: 1rem; right: 1rem; background: rgba(0,0,0,0.1); border: none; width: 40px; height: 40px; border-radius: 50%; font-size: 1.5rem; cursor: pointer; color: var(--text-dark); display: flex; align-items: center; justify-content: center; transition: all 0.3s ease;" onmouseover="this.style.background='rgba(0,0,0,0.2)'" onmouseout="this.style.background='rgba(0,0,0,0.1)'">&times;</button>
+            ${detailsHTML}
+        </div>
+    `;
+    
+    // Close handler that refreshes the registrants view
+    const closeBtn = modal.querySelector('#close-attendee-modal');
+    closeBtn.addEventListener('click', () => {
+        modal.remove();
+        // Refresh the registrants view if we have an event ID
+        if (currentEventId) {
+            viewEventRegistrants(currentEventId);
+        }
+    });
+    
+    // Also close on overlay click
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.remove();
+            if (currentEventId) {
+                viewEventRegistrants(currentEventId);
+            }
+        }
+    });
+    
+    // Close on Escape key
+    const escapeHandler = (e) => {
+        if (e.key === 'Escape' && document.getElementById('attendee-details-modal')) {
+            document.getElementById('attendee-details-modal').remove();
+            if (currentEventId) {
+                viewEventRegistrants(currentEventId);
+            }
+            document.removeEventListener('keydown', escapeHandler);
+        }
+    };
+    document.addEventListener('keydown', escapeHandler);
+    
+    document.body.appendChild(modal);
+}
+
+// Bulk Email Functionality
+function openBulkEmailModal(eventId) {
+    const registrations = JSON.parse(localStorage.getItem('event-registrations') || '[]');
+    const eventRegistrations = registrations.filter(reg => reg.eventId.toString() === eventId.toString());
+    const events = JSON.parse(localStorage.getItem('admin-events') || '[]');
+    const event = events.find(e => (e.id || '').toString() === eventId.toString());
+    
+    if (!event) {
+        alert('Event not found.');
+        return;
+    }
+    
+    if (eventRegistrations.length === 0) {
+        alert('No registrations found for this event.');
+        return;
+    }
+    
+    // Count total recipients (including all attendees)
+    const recipientEmails = new Set();
+    const recipientList = [];
+    
+    eventRegistrations.forEach(reg => {
+        // Add main registrant email
+        if (reg.email) {
+            const cleanEmail = cleanContactInfo(reg.email);
+            if (cleanEmail && !recipientEmails.has(cleanEmail)) {
+                recipientEmails.add(cleanEmail);
+                recipientList.push({
+                    email: cleanEmail,
+                    name: reg.name || reg.organizationName || 'Attendee',
+                    type: reg.registrationType || 'individual'
+                });
+            }
+        }
+        
+        // Add attendee emails if available
+        if (reg.attendeeDetails && reg.attendeeDetails.length > 0) {
+            reg.attendeeDetails.forEach(attendee => {
+                if (attendee.email) {
+                    const cleanEmail = cleanContactInfo(attendee.email);
+                    if (cleanEmail && !recipientEmails.has(cleanEmail)) {
+                        recipientEmails.add(cleanEmail);
+                        recipientList.push({
+                            email: cleanEmail,
+                            name: attendee.name || 'Attendee',
+                            type: 'attendee'
+                        });
+                    }
+                }
+            });
+        }
+    });
+    
+    const totalRecipients = recipientEmails.size;
+    
+    // Default invitation message template
+    const defaultMessage = `Dear ${eventRegistrations.length === 1 ? 'Attendee' : 'Attendees'},
+
+You are cordially invited to attend:
+
+${event.title}
+Date: ${new Date(event.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+${event.time ? `Time: ${event.time}` : ''}
+${event.location ? `Location: ${event.location}` : ''}
+${event.venue ? `Venue: ${event.venue}` : ''}
+
+This invitation serves as your entry ticket to the event. Please present this email or a printed copy at the registration desk.
+
+We look forward to seeing you there!
+
+Best regards,
+Hope A Life International`;
+
+    const modal = document.createElement('div');
+    modal.id = 'bulk-email-modal';
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 3000; display: flex; align-items: center; justify-content: center;';
+    modal.innerHTML = `
+        <div style="background: var(--bg-primary); padding: 2rem; border-radius: 16px; max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.3);">
+            <button id="close-bulk-email-modal" style="position: absolute; top: 1rem; right: 1rem; background: rgba(0,0,0,0.1); border: none; width: 40px; height: 40px; border-radius: 50%; font-size: 1.5rem; cursor: pointer; color: var(--text-dark); display: flex; align-items: center; justify-content: center; transition: all 0.3s ease;" onmouseover="this.style.background='rgba(0,0,0,0.2)'" onmouseout="this.style.background='rgba(0,0,0,0.1)'">&times;</button>
+            
+            <h3 style="margin-bottom: 1rem; color: var(--navy-blue);">Send Invitation Emails</h3>
+            
+            <div style="margin-bottom: 1.5rem; padding: 1rem; background: var(--light-gray); border-radius: 8px;">
+                <p style="margin: 0 0 0.5rem 0;"><strong>Event:</strong> ${event.title}</p>
+                <p style="margin: 0 0 0.5rem 0;"><strong>Total Recipients:</strong> ${totalRecipients} unique email address(es)</p>
+                <p style="margin: 0; color: var(--text-secondary); font-size: 0.9rem;">Emails will be sent to all registered attendees.</p>
+            </div>
+            
+            <form id="bulk-email-form">
+                <div style="margin-bottom: 1.5rem;">
+                    <label for="invitation-card" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Invitation Card (Optional)</label>
+                    <input type="file" id="invitation-card" accept=".pdf,.jpg,.jpeg,.png" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 1rem;">
+                    <small style="color: var(--text-secondary); display: block; margin-top: 0.5rem;">Upload a PDF or JPG invitation card. You'll need to attach it manually when sending.</small>
+                    <div id="invitation-card-preview" style="margin-top: 1rem;"></div>
+                </div>
+                
+                <div style="margin-bottom: 1.5rem;">
+                    <label for="email-subject" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Email Subject *</label>
+                    <input type="text" id="email-subject" required value="Invitation: ${event.title}" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 1rem;">
+                </div>
+                
+                <div style="margin-bottom: 1.5rem;">
+                    <label for="email-message" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Invitation Message *</label>
+                    <textarea id="email-message" required rows="12" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 1rem; font-family: inherit; resize: vertical;">${defaultMessage}</textarea>
+                    <small style="color: var(--text-secondary); display: block; margin-top: 0.5rem;">Edit this message to customize your invitation. It will serve as the invitation/ticket for all attendees.</small>
+                </div>
+                
+                <div id="email-status" style="display: none; margin-bottom: 1rem; padding: 1rem; border-radius: 8px;"></div>
+                
+                <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                    <button type="button" onclick="document.getElementById('bulk-email-modal').remove()" style="padding: 0.75rem 1.5rem; background: var(--light-gray); border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">Cancel</button>
+                    <button type="submit" id="send-email-btn" style="padding: 0.75rem 1.5rem; background: var(--primary-blue); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                        <i class="fas fa-paper-plane"></i> Send Emails (${totalRecipients})
+                    </button>
+                </div>
+            </form>
+        </div>
+    `;
+    
+    // Handle invitation card upload preview
+    const cardInput = modal.querySelector('#invitation-card');
+    const previewDiv = modal.querySelector('#invitation-card-preview');
+    cardInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                if (file.type.startsWith('image/')) {
+                    previewDiv.innerHTML = `
+                        <div style="padding: 1rem; background: var(--light-gray); border-radius: 8px; border: 2px dashed var(--border-color);">
+                            <img src="${event.target.result}" alt="Invitation Card Preview" style="max-width: 100%; max-height: 200px; border-radius: 6px; margin-bottom: 0.5rem;">
+                            <p style="margin: 0; color: var(--text-secondary); font-size: 0.9rem;"><strong>${file.name}</strong> (${(file.size / 1024).toFixed(2)} KB)</p>
+                        </div>
+                    `;
+                } else if (file.type === 'application/pdf') {
+                    previewDiv.innerHTML = `
+                        <div style="padding: 1rem; background: var(--light-gray); border-radius: 8px; border: 2px dashed var(--border-color);">
+                            <i class="fas fa-file-pdf" style="font-size: 3rem; color: var(--primary-blue); margin-bottom: 0.5rem;"></i>
+                            <p style="margin: 0; color: var(--text-secondary); font-size: 0.9rem;"><strong>${file.name}</strong> (${(file.size / 1024).toFixed(2)} KB)</p>
+                        </div>
+                    `;
+                }
+            };
+            reader.readAsDataURL(file);
+        } else {
+            previewDiv.innerHTML = '';
+        }
+    });
+    
+    // Close handler
+    const closeBtn = modal.querySelector('#close-bulk-email-modal');
+    closeBtn.addEventListener('click', () => modal.remove());
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.remove();
+    });
+    
+    // Form submit handler
+    const form = modal.querySelector('#bulk-email-form');
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const subject = form.querySelector('#email-subject').value;
+        const message = form.querySelector('#email-message').value;
+        const cardFile = cardInput.files[0];
+        
+        sendBulkEmails(eventId, subject, message, recipientList, cardFile, modal);
+    });
+    
+    // Close on Escape key
+    const escapeHandler = (e) => {
+        if (e.key === 'Escape' && document.getElementById('bulk-email-modal')) {
+            document.getElementById('bulk-email-modal').remove();
+            document.removeEventListener('keydown', escapeHandler);
+        }
+    };
+    document.addEventListener('keydown', escapeHandler);
+    
+    document.body.appendChild(modal);
+}
+
+function sendBulkEmails(eventId, subject, message, recipientList, cardFile, modal) {
+    if (!recipientList || recipientList.length === 0) {
+        showEmailStatus(modal, 'error', 'No valid email addresses found.');
+        return;
+    }
+    
+    const statusDiv = modal.querySelector('#email-status');
+    const sendBtn = modal.querySelector('#send-email-btn');
+    
+    // Disable send button and show loading
+    sendBtn.disabled = true;
+    sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+    showEmailStatus(modal, 'info', 'Preparing emails...');
+    
+    // Process invitation card if uploaded
+    let cardDataUrl = null;
+    let cardFileName = null;
+    
+    if (cardFile) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            cardDataUrl = e.target.result;
+            cardFileName = cardFile.name;
+            completeEmailSend(eventId, subject, message, recipientList, cardDataUrl, cardFileName, modal, statusDiv, sendBtn);
+        };
+        reader.onerror = () => {
+            showEmailStatus(modal, 'error', 'Error reading invitation card file.');
+            sendBtn.disabled = false;
+            sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Emails';
+        };
+        reader.readAsDataURL(cardFile);
+    } else {
+        completeEmailSend(eventId, subject, message, recipientList, null, null, modal, statusDiv, sendBtn);
+    }
+}
+
+function completeEmailSend(eventId, subject, message, recipientList, cardDataUrl, cardFileName, modal, statusDiv, sendBtn) {
+    try {
+        // Build email body with invitation card note if available
+        let emailBody = message;
+        
+        if (cardDataUrl) {
+            emailBody += `\n\n---\nInvitation Card:\n`;
+            emailBody += `\nPlease see the attached invitation card file: ${cardFileName}`;
+            emailBody += `\n\nNote: You will need to manually attach the invitation card file when sending this email.`;
+        }
+        
+        // Get all email addresses
+        const recipientEmails = recipientList.map(r => r.email);
+        const primaryEmail = recipientEmails[0];
+        const bccEmails = recipientEmails.slice(1);
+        
+        // Encode the message for URL
+        const encodedSubject = encodeURIComponent(subject);
+        const encodedBody = encodeURIComponent(emailBody);
+        
+        // Create mailto link
+        let mailtoLink = `mailto:${primaryEmail}?subject=${encodedSubject}&body=${encodedBody}`;
+        if (bccEmails.length > 0) {
+            mailtoLink += `&bcc=${bccEmails.join(',')}`;
+        }
+        
+        showEmailStatus(modal, 'info', `Opening email client with ${recipientEmails.length} recipient(s)...`);
+        
+        // Open email client
+        window.location.href = mailtoLink;
+        
+        // Show success after a delay
+        setTimeout(() => {
+            const successMessage = `✅ Email client opened successfully!\n\nRecipients: ${recipientEmails.length}\n\n${cardDataUrl ? '⚠️ IMPORTANT: Please remember to attach the invitation card file (' + cardFileName + ') manually before sending.' : ''}\n\nIf your email client doesn't support BCC, you may need to send individual emails or use a bulk email service.`;
+            showEmailStatus(modal, 'success', successMessage);
+            
+            // Log the email action (for admin tracking)
+            const emailLog = JSON.parse(localStorage.getItem('admin-email-logs') || '[]');
+            emailLog.push({
+                eventId: eventId,
+                subject: subject,
+                recipients: recipientEmails.length,
+                recipientList: recipientEmails,
+                hasInvitationCard: !!cardDataUrl,
+                invitationCardName: cardFileName,
+                sentAt: new Date().toISOString()
+            });
+            localStorage.setItem('admin-email-logs', JSON.stringify(emailLog));
+            
+            // Re-enable button with success state
+            sendBtn.disabled = false;
+            sendBtn.innerHTML = '<i class="fas fa-check"></i> Email Client Opened';
+            sendBtn.style.background = '#10b981';
+            
+            // Auto-close modal after 8 seconds
+            setTimeout(() => {
+                if (document.getElementById('bulk-email-modal')) {
+                    document.getElementById('bulk-email-modal').remove();
+                }
+            }, 8000);
+        }, 1000);
+        
+    } catch (error) {
+        console.error('Error sending emails:', error);
+        showEmailStatus(modal, 'error', `❌ Error: ${error.message}`);
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Emails';
+    }
+}
+
+function showEmailStatus(modal, type, message) {
+    const statusDiv = modal.querySelector('#email-status');
+    if (!statusDiv) return;
+    
+    statusDiv.style.display = 'block';
+    
+    const colors = {
+        success: { bg: '#d1fae5', border: '#10b981', text: '#065f46', icon: 'fa-check-circle' },
+        error: { bg: '#fee2e2', border: '#ef4444', text: '#991b1b', icon: 'fa-exclamation-circle' },
+        info: { bg: '#dbeafe', border: '#3b82f6', text: '#1e40af', icon: 'fa-info-circle' }
+    };
+    
+    const color = colors[type] || colors.info;
+    
+    statusDiv.style.background = color.bg;
+    statusDiv.style.border = `2px solid ${color.border}`;
+    statusDiv.style.color = color.text;
+    statusDiv.innerHTML = `
+        <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+            <i class="fas ${color.icon}" style="font-size: 1.25rem; margin-top: 0.25rem;"></i>
+            <div style="flex: 1;">
+                <p style="margin: 0; white-space: pre-line; line-height: 1.6;">${message}</p>
+            </div>
+        </div>
+    `;
+}
+
+// Quotes Management Functions
+function loadQuotes() {
+    const quotesList = document.getElementById('quotes-list');
+    if (!quotesList) return;
+    
+    const quotes = getQuotesFromStorage();
+    
+    if (quotes.length === 0) {
+        quotesList.innerHTML = '<p class="empty-state">No quotes added yet. Add your first quote above.</p>';
+        return;
+    }
+    
+    quotesList.innerHTML = quotes.map((quote, index) => {
+        const dateDisplay = quote.date ? new Date(quote.date).toLocaleDateString() : 'General (No date)';
+        const isScheduled = quote.date && new Date(quote.date) > new Date();
+        return `
+            <div class="quote-item" data-index="${index}">
+                <div class="quote-item-content">
+                    <div class="quote-item-text">
+                        <p>"${quote.text}"</p>
+                        ${quote.author ? `<span class="quote-item-author">— ${quote.author}</span>` : ''}
+                    </div>
+                    <div class="quote-item-meta">
+                        <span class="quote-date-badge ${isScheduled ? 'scheduled' : ''}">
+                            <i class="fas fa-calendar"></i> ${dateDisplay}
+                        </span>
+                    </div>
+                </div>
+                <div class="quote-item-actions">
+                    <button class="btn-icon" onclick="editQuote(${index})" title="Edit quote">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn-icon btn-danger" onclick="deleteQuote(${index})" title="Delete quote">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function getQuotesFromStorage() {
+    try {
+        const quotes = localStorage.getItem('dailyQuotes');
+        return quotes ? JSON.parse(quotes) : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function saveQuotesToStorage(quotes) {
+    localStorage.setItem('dailyQuotes', JSON.stringify(quotes));
+}
+
+function saveQuote() {
+    const textInput = document.getElementById('quote-text-input');
+    const authorInput = document.getElementById('quote-author-input');
+    const dateInput = document.getElementById('quote-date-input');
+    
+    if (!textInput || !textInput.value.trim()) {
+        alert('Please enter a quote text.');
+        return;
+    }
+    
+    const quotes = getQuotesFromStorage();
+    const newQuote = {
+        text: textInput.value.trim(),
+        author: authorInput ? authorInput.value.trim() : '',
+        date: dateInput && dateInput.value ? dateInput.value : '',
+        createdAt: new Date().toISOString()
+    };
+    
+    quotes.push(newQuote);
+    saveQuotesToStorage(quotes);
+    
+    // Clear form
+    clearQuoteForm();
+    
+    // Reload quotes list
+    loadQuotes();
+    
+    // Show success message
+    alert('Quote saved successfully!');
+}
+
+function editQuote(index) {
+    const quotes = getQuotesFromStorage();
+    const quote = quotes[index];
+    
+    if (!quote) return;
+    
+    const textInput = document.getElementById('quote-text-input');
+    const authorInput = document.getElementById('quote-author-input');
+    const dateInput = document.getElementById('quote-date-input');
+    
+    if (textInput) textInput.value = quote.text;
+    if (authorInput) authorInput.value = quote.author || '';
+    if (dateInput) dateInput.value = quote.date || '';
+    
+    // Remove old quote and save new one
+    quotes.splice(index, 1);
+    saveQuotesToStorage(quotes);
+    
+    // Scroll to form
+    if (textInput) textInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (textInput) textInput.focus();
+}
+
+function deleteQuote(index) {
+    if (!confirm('Are you sure you want to delete this quote?')) return;
+    
+    const quotes = getQuotesFromStorage();
+    quotes.splice(index, 1);
+    saveQuotesToStorage(quotes);
+    loadQuotes();
+}
+
+function clearQuoteForm() {
+    const textInput = document.getElementById('quote-text-input');
+    const authorInput = document.getElementById('quote-author-input');
+    const dateInput = document.getElementById('quote-date-input');
+    
+    if (textInput) textInput.value = '';
+    if (authorInput) authorInput.value = '';
+    if (dateInput) dateInput.value = '';
+}
+
+// Verses Management Functions
+function loadVerses() {
+    const versesList = document.getElementById('verses-list');
+    if (!versesList) return;
+    
+    const verses = getVersesFromStorage();
+    
+    if (verses.length === 0) {
+        versesList.innerHTML = '<p class="empty-state">No verses added yet. Add your first verse above.</p>';
+        return;
+    }
+    
+    versesList.innerHTML = verses.map((verse, index) => {
+        const dateDisplay = verse.date ? new Date(verse.date).toLocaleDateString() : 'General (No date)';
+        const isScheduled = verse.date && new Date(verse.date) > new Date();
+        return `
+            <div class="quote-item" data-index="${index}">
+                <div class="quote-item-content">
+                    <div class="quote-item-text">
+                        <p>"${verse.text}"</p>
+                        ${verse.reference ? `<span class="quote-item-author">— ${verse.reference}</span>` : ''}
+                    </div>
+                    <div class="quote-item-meta">
+                        <span class="quote-date-badge ${isScheduled ? 'scheduled' : ''}">
+                            <i class="fas fa-calendar"></i> ${dateDisplay}
+                        </span>
+                    </div>
+                </div>
+                <div class="quote-item-actions">
+                    <button class="btn-icon" onclick="editVerse(${index})" title="Edit verse">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn-icon btn-danger" onclick="deleteVerse(${index})" title="Delete verse">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function getVersesFromStorage() {
+    try {
+        const verses = localStorage.getItem('dailyVerses');
+        return verses ? JSON.parse(verses) : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function saveVersesToStorage(verses) {
+    localStorage.setItem('dailyVerses', JSON.stringify(verses));
+}
+
+function saveVerse() {
+    const textInput = document.getElementById('verse-text-input');
+    const referenceInput = document.getElementById('verse-reference-input');
+    const dateInput = document.getElementById('verse-date-input');
+    
+    if (!textInput || !textInput.value.trim()) {
+        alert('Please enter a verse text.');
+        return;
+    }
+    
+    const verses = getVersesFromStorage();
+    const newVerse = {
+        text: textInput.value.trim(),
+        reference: referenceInput ? referenceInput.value.trim() : '',
+        date: dateInput && dateInput.value ? dateInput.value : '',
+        createdAt: new Date().toISOString()
+    };
+    
+    verses.push(newVerse);
+    saveVersesToStorage(verses);
+    
+    // Clear form
+    clearVerseForm();
+    
+    // Reload verses list
+    loadVerses();
+    
+    // Show success message
+    alert('Verse saved successfully!');
+}
+
+function editVerse(index) {
+    const verses = getVersesFromStorage();
+    const verse = verses[index];
+    
+    if (!verse) return;
+    
+    const textInput = document.getElementById('verse-text-input');
+    const referenceInput = document.getElementById('verse-reference-input');
+    const dateInput = document.getElementById('verse-date-input');
+    
+    if (textInput) textInput.value = verse.text;
+    if (referenceInput) referenceInput.value = verse.reference || '';
+    if (dateInput) dateInput.value = verse.date || '';
+    
+    // Remove old verse and save new one
+    verses.splice(index, 1);
+    saveVersesToStorage(verses);
+    
+    // Scroll to form
+    if (textInput) textInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (textInput) textInput.focus();
+}
+
+function deleteVerse(index) {
+    if (!confirm('Are you sure you want to delete this verse?')) return;
+    
+    const verses = getVersesFromStorage();
+    verses.splice(index, 1);
+    saveVersesToStorage(verses);
+    loadVerses();
+}
+
+function clearVerseForm() {
+    const textInput = document.getElementById('verse-text-input');
+    const referenceInput = document.getElementById('verse-reference-input');
+    const dateInput = document.getElementById('verse-date-input');
+    
+    if (textInput) textInput.value = '';
+    if (referenceInput) referenceInput.value = '';
+    if (dateInput) dateInput.value = '';
+}
+
+// Listen for new registrations
+window.addEventListener('event-registration-added', () => {
+    // Refresh if viewing registrants
+    const container = document.getElementById('event-registrations-container');
+    if (container && container.querySelector('.registrants-table')) {
+        const eventId = container.getAttribute('data-current-event-id');
+        if (eventId) {
+            viewEventRegistrants(eventId);
+        }
+    }
+});
+
+// News Management
+function loadNews(searchTerm = '', pendingSearchTerm = '') {
+    const news = JSON.parse(localStorage.getItem('admin-news') || '[]');
+    const pendingNews = JSON.parse(localStorage.getItem('pending-news') || '[]');
+    
+    const publishedList = document.getElementById('news-list');
+    const pendingList = document.getElementById('pending-news-list');
+    
+    // Filter published news if search term provided
+    let filteredNews = news;
+    if (searchTerm.trim()) {
+        const searchLower = searchTerm.toLowerCase();
+        filteredNews = news.filter(item => 
+            (item.title && item.title.toLowerCase().includes(searchLower)) ||
+            (item.content && item.content.toLowerCase().includes(searchLower)) ||
+            (item.source && item.source.toLowerCase().includes(searchLower)) ||
+            (item.author && item.author.toLowerCase().includes(searchLower))
+        );
+    }
+    
+    // Filter pending news if search term provided
+    let filteredPendingNews = pendingNews;
+    if (pendingSearchTerm.trim()) {
+        const searchLower = pendingSearchTerm.toLowerCase();
+        filteredPendingNews = pendingNews.filter(item => 
+            (item.title && item.title.toLowerCase().includes(searchLower)) ||
+            (item.content && item.content.toLowerCase().includes(searchLower)) ||
+            (item.source && item.source.toLowerCase().includes(searchLower)) ||
+            (item.author && item.author.toLowerCase().includes(searchLower))
+        );
+    }
+    
+    if (filteredNews.length === 0) {
+        publishedList.innerHTML = searchTerm.trim()
+            ? `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No news articles found matching "${searchTerm}"</p>`
+            : '<p>No news articles published yet.</p>';
+    } else {
+        publishedList.innerHTML = filteredNews.map((item, displayIndex) => {
+            // Find original index for delete function
+            const originalIndex = news.findIndex(n => n.id === item.id);
+            return `
+            <div class="item-card">
+                <div class="item-card-content">
+                    <h3>${item.title}</h3>
+                    <p><strong>Source:</strong> ${item.source} | <strong>Date:</strong> ${new Date(item.date).toLocaleDateString()}</p>
+                    <p>${item.content.substring(0, 150)}...</p>
+                    ${item.link ? `<p><a href="${item.link}" target="_blank">Read more →</a></p>` : ''}
+                </div>
+                <div class="item-card-actions">
+                    <button class="btn btn-danger" onclick="deleteNews(${originalIndex})">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </div>
+            </div>
+        `;
+        }).join('');
+    }
+    
+    if (filteredPendingNews.length === 0) {
+        pendingList.innerHTML = pendingSearchTerm.trim()
+            ? `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No pending news found matching "${pendingSearchTerm}"</p>`
+            : '<p>No pending news submissions.</p>';
+    } else {
+        pendingList.innerHTML = filteredPendingNews.map((item, displayIndex) => {
+            // Find original index for approve/reject functions
+            const originalIndex = pendingNews.findIndex(n => n.id === item.id);
+            return `
+            <div class="item-card">
+                <div class="item-card-content">
+                    <h3>${item.title}</h3>
+                    <p><strong>Submitted:</strong> ${new Date(item.submittedAt).toLocaleDateString()}</p>
+                    <p>${item.content.substring(0, 150)}...</p>
+                </div>
+                <div class="item-card-actions">
+                    <button class="btn btn-primary" onclick="approveNews(${originalIndex})">
+                        <i class="fas fa-check"></i> Approve
+                    </button>
+                    <button class="btn btn-danger" onclick="rejectNews(${originalIndex})">
+                        <i class="fas fa-times"></i> Reject
+                    </button>
+                </div>
+            </div>
+        `;
+        }).join('');
+    }
+}
+
+document.getElementById('news-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    
+    const news = {
+        id: Date.now(),
+        title: document.getElementById('news-title').value,
+        content: document.getElementById('news-content').value,
+        image: document.getElementById('news-image').value,
+        link: document.getElementById('news-link').value,
+        source: document.getElementById('news-source').value,
+        date: new Date().toISOString()
+    };
+    
+    const newsList = JSON.parse(localStorage.getItem('admin-news') || '[]');
+    newsList.push(news);
+    localStorage.setItem('admin-news', JSON.stringify(newsList));
+    
+    showAlert('news-alert', '✅ News article published!', 'success');
+    document.getElementById('news-form').reset();
+    loadNews();
+    
+    // Trigger real-time update event
+    window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'news' } }));
+});
+
+function approveNews(index) {
+    const pendingNews = JSON.parse(localStorage.getItem('pending-news') || '[]');
+    const news = pendingNews[index];
+    news.date = new Date().toISOString();
+    
+    const newsList = JSON.parse(localStorage.getItem('admin-news') || '[]');
+    newsList.push(news);
+    localStorage.setItem('admin-news', JSON.stringify(newsList));
+    
+    pendingNews.splice(index, 1);
+    localStorage.setItem('pending-news', JSON.stringify(pendingNews));
+    
+    loadNews();
+    
+    // Trigger real-time update event
+    window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'news' } }));
+    window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'news' } }));
+}
+
+function rejectNews(index) {
+    if (confirm('Are you sure you want to reject this news submission?')) {
+        const pendingNews = JSON.parse(localStorage.getItem('pending-news') || '[]');
+        pendingNews.splice(index, 1);
+        localStorage.setItem('pending-news', JSON.stringify(pendingNews));
+        loadNews();
+    }
+}
+
+function deleteNews(index) {
+    if (confirm('Are you sure you want to delete this news article?')) {
+        const news = JSON.parse(localStorage.getItem('admin-news') || '[]');
+        news.splice(index, 1);
+        localStorage.setItem('admin-news', JSON.stringify(news));
+        loadNews();
+        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'news' } }));
+    }
+}
+
+// Publications Management
+function loadPublications(searchTerm = '') {
+    const publications = JSON.parse(localStorage.getItem('admin-publications') || '[]');
+    const list = document.getElementById('publications-list');
+    
+    // Filter publications if search term provided
+    let filteredPublications = publications;
+    if (searchTerm.trim()) {
+        const searchLower = searchTerm.toLowerCase();
+        filteredPublications = publications.filter(pub => 
+            (pub.title && pub.title.toLowerCase().includes(searchLower)) ||
+            (pub.content && pub.content.toLowerCase().includes(searchLower)) ||
+            (pub.author && pub.author.toLowerCase().includes(searchLower)) ||
+            (pub.description && pub.description.toLowerCase().includes(searchLower))
+        );
+    }
+    
+    if (filteredPublications.length === 0) {
+        list.innerHTML = searchTerm.trim()
+            ? `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No publications found matching "${searchTerm}"</p>`
+            : '<p>No publications created yet. Create one above!</p>';
+        return;
+    }
+    
+    list.innerHTML = filteredPublications.map((pub, displayIndex) => {
+        // Find original index for edit/delete functions
+        const originalIndex = publications.findIndex(p => p.id === pub.id);
+        return `
+        <div class="item-card">
+            <div class="item-card-content">
+                <h3>${pub.title}</h3>
+                ${pub.author ? `<p><strong>Author:</strong> ${pub.author}</p>` : ''}
+                <p><strong>Date:</strong> ${new Date(pub.date).toLocaleDateString()}</p>
+                <p>${pub.content.substring(0, 200)}...</p>
+                ${pub.images && pub.images.length > 0 ? `<p><strong>Images:</strong> ${pub.images.length} image(s)</p>` : ''}
+                ${pub.videos && pub.videos.length > 0 ? `<p><strong>Videos:</strong> ${pub.videos.length} video(s)</p>` : ''}
+            </div>
+            <div class="item-card-actions">
+                <button class="btn btn-danger" onclick="deletePublication(${originalIndex})">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+            </div>
+        </div>
+    `;
+    }).join('');
+}
+
+document.getElementById('publication-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const publication = {
+        id: Date.now(),
+        title: document.getElementById('publication-title').value,
+        content: document.getElementById('publication-content').value,
+        author: document.getElementById('publication-author').value,
+        date: document.getElementById('publication-date').value || new Date().toISOString(),
+        images: [],
+        videos: [],
+        createdAt: new Date().toISOString()
+    };
+    
+    // Handle WordPress fetch
+    const wordpressUrl = document.getElementById('wordpress-url').value;
+    if (wordpressUrl) {
+        try {
+            const response = await fetch(wordpressUrl);
+            const data = await response.json();
+            publication.content = data.content?.rendered || publication.content;
+            publication.title = data.title?.rendered || publication.title;
+            if (data.featured_media) {
+                // Fetch media URL
+                const mediaResponse = await fetch(`${wordpressUrl.split('/wp/v2/posts/')[0]}/wp/v2/media/${data.featured_media}`);
+                const mediaData = await mediaResponse.json();
+                publication.images.push(mediaData.source_url);
+            }
+        } catch (error) {
+            console.error('WordPress fetch error:', error);
+            showAlert('publication-alert', '⚠️ Could not fetch from WordPress. Using form data.', 'error');
+        }
+    }
+    
+    // Handle image files
+    const imageFiles = document.getElementById('publication-images').files;
+    if (imageFiles.length > 0) {
+        for (let file of imageFiles) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                publication.images.push(e.target.result);
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+    
+    // Handle video files/URLs
+    const videoFiles = document.getElementById('publication-videos').files;
+    const videoUrls = document.getElementById('publication-video-urls').value.split(',').filter(url => url.trim());
+    
+    if (videoFiles.length > 0) {
+        for (let file of videoFiles) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                publication.videos.push(e.target.result);
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+    
+    if (videoUrls.length > 0) {
+        publication.videos.push(...videoUrls.map(url => url.trim()));
+    }
+    
+    // Wait a bit for file readers
+    setTimeout(() => {
+        const publications = JSON.parse(localStorage.getItem('admin-publications') || '[]');
+        publications.push(publication);
+        localStorage.setItem('admin-publications', JSON.stringify(publications));
+        
+        showAlert('publication-alert', '✅ Publication created successfully!', 'success');
+        document.getElementById('publication-form').reset();
+        loadPublications();
+        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'publications' } }));
+    }, 1000);
+});
+
+function deletePublication(index) {
+    if (confirm('Are you sure you want to delete this publication?')) {
+        const publications = JSON.parse(localStorage.getItem('admin-publications') || '[]');
+        publications.splice(index, 1);
+        localStorage.setItem('admin-publications', JSON.stringify(publications));
+        loadPublications();
+        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'publications' } }));
+    }
+}
+
+// Update pending count on load and when new stories arrive
+function updatePendingCount() {
+    const pendingStories = JSON.parse(localStorage.getItem('pending-stories') || '[]');
+    const pendingCount = pendingStories.filter(s => s.status === 'pending').length;
+    const badge = document.getElementById('pending-count');
+    if (badge) {
+        badge.textContent = pendingCount;
+        badge.style.display = pendingCount > 0 ? 'inline-block' : 'none';
+    }
+}
+
+// Listen for new pending stories
+window.addEventListener('new-pending-story', (event) => {
+    console.log('New pending story event received:', event.detail);
+    updatePendingCount();
+    const pendingTab = document.getElementById('pending-stories-tab');
+    if (pendingTab && pendingTab.classList.contains('active')) {
+        loadPendingStories();
+    }
+});
+
+// Listen for storage events (cross-tab communication)
+window.addEventListener('storage', (event) => {
+    if (event.key === 'pending-stories') {
+        console.log('Storage event detected for pending-stories');
+        updatePendingCount();
+        const pendingTab = document.getElementById('pending-stories-tab');
+        if (pendingTab && pendingTab.classList.contains('active')) {
+            loadPendingStories();
+        }
+    }
+});
+
+// Also listen for custom storage events (same-tab)
+window.addEventListener('pending-stories-updated', () => {
+    console.log('Pending stories updated event received');
+    updatePendingCount();
+    const pendingTab = document.getElementById('pending-stories-tab');
+    if (pendingTab && pendingTab.classList.contains('active')) {
+        loadPendingStories();
+    }
+});
+
+// Search functionality - Add event listeners for all search inputs
+document.addEventListener('DOMContentLoaded', () => {
+    // Testimonials search
+    const testimonialsSearch = document.getElementById('testimonials-search');
+    if (testimonialsSearch) {
+        testimonialsSearch.addEventListener('input', (e) => {
+            loadTestimonials(e.target.value);
+        });
+    }
+    
+    // Photos search
+    const photosSearch = document.getElementById('photos-search');
+    if (photosSearch) {
+        photosSearch.addEventListener('input', (e) => {
+            loadPhotos(e.target.value);
+        });
+    }
+    
+    // Videos search
+    const videosSearch = document.getElementById('videos-search');
+    if (videosSearch) {
+        videosSearch.addEventListener('input', (e) => {
+            loadVideos(e.target.value);
+        });
+    }
+    
+    // Comments search
+    const commentsSearch = document.getElementById('comments-search');
+    if (commentsSearch) {
+        commentsSearch.addEventListener('input', (e) => {
+            loadComments(e.target.value);
+        });
+    }
+    
+    // Pending Stories search
+    const pendingStoriesSearch = document.getElementById('pending-stories-search');
+    if (pendingStoriesSearch) {
+        pendingStoriesSearch.addEventListener('input', (e) => {
+            loadPendingStories(e.target.value);
+        });
+    }
+    
+    // Events search
+    const eventsSearch = document.getElementById('events-search');
+    if (eventsSearch) {
+        eventsSearch.addEventListener('input', (e) => {
+            loadEvents(e.target.value);
+        });
+    }
+    
+    // News search (published)
+    const newsSearch = document.getElementById('news-search');
+    if (newsSearch) {
+        newsSearch.addEventListener('input', (e) => {
+            const pendingSearch = document.getElementById('pending-news-search');
+            loadNews(e.target.value, pendingSearch ? pendingSearch.value : '');
+        });
+    }
+    
+    // Pending News search
+    const pendingNewsSearch = document.getElementById('pending-news-search');
+    if (pendingNewsSearch) {
+        pendingNewsSearch.addEventListener('input', (e) => {
+            const publishedSearch = document.getElementById('news-search');
+            loadNews(publishedSearch ? publishedSearch.value : '', e.target.value);
+        });
+    }
+    
+    // Publications search
+    const publicationsSearch = document.getElementById('publications-search');
+    if (publicationsSearch) {
+        publicationsSearch.addEventListener('input', (e) => {
+            loadPublications(e.target.value);
+        });
+    }
+});
+
+// Load initial content
+loadTabContent('testimonials');
+updatePendingCount();
+

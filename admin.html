@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Admin Panel for Hope A Life International - Manage content, testimonials, photos, videos, and comments.">
+    <title>Admin Panel | Hope A Life International</title>
+    <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="assets/css/main.css">
+    <style>
+        /* Admin Hero Section */
+        .admin-hero {
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.95), rgba(14, 165, 233, 0.9)), 
+                        radial-gradient(circle at 30% 40%, rgba(147, 51, 234, 0.2), transparent 50%);
+            padding: clamp(3rem, 5vw + 2rem, 5rem) 0;
+            margin-top: 3.5rem;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .admin-hero::before,
+        .admin-hero::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.3;
+        }
+        
+        .admin-hero::before {
+            background: radial-gradient(circle at 30% 40%, rgba(147, 51, 234, 0.15), transparent 50%);
+            animation: adminFloat1 20s ease-in-out infinite;
+        }
+        
+        .admin-hero::after {
+            background: radial-gradient(circle at 70% 60%, rgba(37, 99, 235, 0.12), transparent 50%);
+            animation: adminFloat2 25s ease-in-out infinite;
+        }
+        
+        @keyframes adminFloat1 {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(20px, -15px) scale(1.1); }
+            66% { transform: translate(-15px, 20px) scale(0.95); }
+        }
+        
+        @keyframes adminFloat2 {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(-18px, 18px) scale(0.9); }
+            66% { transform: translate(18px, -18px) scale(1.15); }
+        }
+        
+        .admin-hero-content {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            color: white;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .admin-hero-content h1 {
+            font-size: clamp(2rem, 4vw, 3rem);
+            font-weight: 700;
+            margin: 0 auto 1rem auto;
+            text-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+            text-align: center;
+        }
+        
+        .admin-hero-content h1 i {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        
+        .admin-hero-content p {
+            font-size: clamp(1rem, 1.5vw, 1.25rem);
+            margin: 0 auto;
+            opacity: 0.95;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            max-width: 600px;
+        }
+        
+        .admin-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: clamp(2rem, 4vw, 4rem) 2rem;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .admin-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            background: var(--bg-secondary);
+            padding: 0.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            flex-wrap: wrap;
+            border: 1px solid var(--border-color);
+        }
+        
+        .admin-tab {
+            padding: 0.875rem 1.5rem;
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .admin-tab i {
+            font-size: 1.1em;
+        }
+        
+        .pending-badge {
+            background: #ef4444;
+            color: white;
+            border-radius: 12px;
+            padding: 0.2rem 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            margin-left: 0.5rem;
+            min-width: 20px;
+            text-align: center;
+            display: inline-block;
+        }
+        
+        .admin-tab.active {
+            background: linear-gradient(135deg, var(--primary-blue), var(--primary-cyan));
+            color: white;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        .admin-tab:hover:not(.active) {
+            background: var(--bg-tertiary);
+            color: var(--primary-blue);
+        }
+        
+        .admin-content {
+            display: none;
+        }
+        
+        .admin-content.active {
+            display: block;
+        }
+        
+        .admin-card {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: clamp(1.5rem, 3vw, 2.5rem);
+            margin-bottom: 2rem;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .admin-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary-blue), var(--primary-cyan));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .admin-card:hover {
+            box-shadow: 0 12px 32px rgba(37, 99, 235, 0.12), 0 4px 12px rgba(0, 0, 0, 0.06);
+            transform: translateY(-2px);
+        }
+        
+        .admin-card:hover::before {
+            opacity: 1;
+        }
+        
+        .admin-card h2 {
+            margin: 0 0 1.5rem 0;
+            color: var(--text-primary);
+            font-size: clamp(1.25rem, 2vw, 1.75rem);
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--text-primary) 0%, var(--primary-blue) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .admin-card h2::before {
+            content: '';
+            width: 4px;
+            height: 1.5em;
+            background: linear-gradient(135deg, var(--primary-blue), var(--primary-cyan));
+            border-radius: 2px;
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: inherit;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+        }
+        
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+        
+        .form-group textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+        
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin: 0 auto;
+        }
+        
+        /* Center all submit buttons in forms */
+        .admin-card form {
+            width: 100%;
+        }
+        
+        .form-group button[type="submit"],
+        .admin-card button[type="submit"] {
+            display: flex;
+            margin-left: auto;
+            margin-right: auto;
+            width: auto;
+        }
+        
+        /* Center all action buttons */
+        .btn-primary,
+        .btn-secondary,
+        .btn-danger {
+            display: inline-flex;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        /* Center buttons container */
+        .admin-card > .btn,
+        .admin-card form > .btn {
+            display: flex;
+            margin: 1rem auto 0 auto;
+        }
+        
+        /* Center action buttons in item cards on mobile */
+        @media (max-width: 768px) {
+            .item-card {
+                text-align: center;
+            }
+            
+            .item-card-actions {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-blue), var(--primary-cyan));
+            color: white;
+            border: none;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+            background: linear-gradient(135deg, var(--primary-cyan), var(--primary-blue));
+        }
+        
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+        
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+        
+        .btn-secondary {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+        
+        .btn-secondary:hover {
+            background: var(--bg-tertiary);
+        }
+        
+        .items-list {
+            display: grid;
+            gap: 1rem;
+        }
+        
+        .item-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            gap: 1rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+        
+        .item-card:hover {
+            box-shadow: 0 4px 16px rgba(37, 99, 235, 0.1);
+            transform: translateY(-2px);
+            border-color: var(--primary-blue);
+        }
+        
+        .item-card-content {
+            flex: 1;
+        }
+        
+        .item-card-content h3 {
+            margin: 0 0 0.5rem 0;
+            color: var(--text-primary);
+        }
+        
+        .item-card-content p {
+            margin: 0;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+        
+        .item-card-actions {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        @media (min-width: 769px) {
+            .item-card-actions {
+                justify-content: flex-end;
+            }
+        }
+        
+        .file-upload-area {
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .file-upload-area:hover {
+            border-color: var(--primary-blue);
+            background: rgba(37, 99, 235, 0.05);
+        }
+        
+        .file-upload-area.dragover {
+            border-color: var(--primary-blue);
+            background: rgba(37, 99, 235, 0.1);
+        }
+        
+        .preview-image {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+        
+        .alert {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+        
+        .alert-success {
+            background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+            border-left: 4px solid #10b981;
+        }
+        
+        .alert-error {
+            background: linear-gradient(135deg, #fee2e2, #fecaca);
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+            border-left: 4px solid #ef4444;
+        }
+        
+        .alert a {
+            color: inherit;
+            text-decoration: underline;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+        
+        .alert a:hover {
+            text-decoration: none;
+        }
+        
+        /* Dark mode support for admin */
+        [data-theme="dark"] .admin-hero {
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.9)), 
+                        radial-gradient(circle at 30% 40%, rgba(147, 51, 234, 0.25), transparent 50%);
+        }
+        
+        [data-theme="dark"] .admin-card {
+            background: var(--bg-secondary);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        [data-theme="dark"] .item-card {
+            background: var(--bg-tertiary);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .admin-hero {
+                padding: clamp(2rem, 4vw + 1.5rem, 3rem) 0;
+                margin-top: 3rem;
+            }
+            
+            .admin-container {
+                padding: 1.5rem 1rem;
+            }
+            
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .item-card {
+                flex-direction: column;
+            }
+            
+            .admin-tabs {
+                gap: 0.25rem;
+                padding: 0.25rem;
+            }
+            
+            .admin-tab {
+                padding: 0.75rem 1rem;
+                font-size: 0.875rem;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .admin-hero-content h1 {
+                font-size: 1.75rem;
+            }
+            
+            .admin-card {
+                padding: 1.25rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    
+    <div class="progress-bar" role="presentation">
+        <div class="progress-fill"></div>
+    </div>
+
+    <header>
+        <div class="container">
+            <nav>
+                <div class="logo-container">
+                    <img src="https://hopealife.org/images/logo.png" alt="Hope A Life International Logo" class="logo-img">
+                    <span class="nav-slogan">Hope starts with you</span>
+                </div>
+                <ul class="nav-links" id="primary-navigation" aria-hidden="true">
+                    <button class="nav-collapse" type="button" aria-label="Close navigation">
+                        <i class="fas fa-angle-right" aria-hidden="true"></i>
+                    </button>
+                    <li><a href="index.html" aria-label="Home">Home</a></li>
+                    <li><a href="CPHILADMIN.html" aria-label="Admin Panel" class="active">Admin Panel</a></li>
+                    <li class="nav-sidebar-footer">
+                        <img src="https://hopealife.org/images/logo.png" alt="Hope A Life International Logo" class="nav-sidebar-logo">
+                    </li>
+                </ul>
+                <div class="nav-actions">
+                    <button class="hamburger" type="button" aria-label="Toggle navigation menu" aria-controls="primary-navigation" aria-expanded="false">
+                        <span class="hamburger-line"></span>
+                        <span class="hamburger-line"></span>
+                        <span class="hamburger-line"></span>
+                    </button>
+                    <button class="theme-toggle" type="button" aria-label="Toggle dark mode" title="Toggle dark mode">
+                        <i class="fas fa-moon" aria-hidden="true"></i>
+                        <i class="fas fa-sun" aria-hidden="true" style="display: none;"></i>
+                        <span class="sr-only">Toggle dark mode</span>
+                    </button>
+                </div>
+            </nav>
+        </div>
+        <button class="header-collapse" type="button" aria-label="Collapse header" aria-pressed="false" title="Collapse header">
+            <i class="fas fa-chevron-up" aria-hidden="true"></i>
+            <span class="sr-only">Collapse header</span>
+        </button>
+        <div class="nav-overlay" aria-hidden="true"></div>
+    </header>
+
+    <main id="main-content">
+    <div id="admin" style="display:none;">
+    <section class="admin-hero" aria-labelledby="admin-hero-title">
+        <div class="container">
+            <div class="admin-hero-content">
+                <h1 id="admin-hero-title"><i class="fas fa-shield-alt"></i> Admin Panel</h1>
+                <p>Manage content, testimonials, photos, videos, and comments for Hope A Life International</p>
+            </div>
+        </div>
+    </section>
+
+    <div class="admin-container">
+        <div class="admin-tabs">
+            <button class="admin-tab active" data-tab="testimonials">
+                <i class="fas fa-comments"></i> Testimonials
+            </button>
+            <button class="admin-tab" data-tab="photos">
+                <i class="fas fa-images"></i> Photos
+            </button>
+            <button class="admin-tab" data-tab="videos">
+                <i class="fas fa-video"></i> Videos
+            </button>
+            <button class="admin-tab" data-tab="comments">
+                <i class="fas fa-comment-dots"></i> Comments
+            </button>
+            <button class="admin-tab" data-tab="pending-stories">
+                <i class="fas fa-clock"></i> Pending Stories <span class="pending-badge" id="pending-count">0</span>
+            </button>
+            <button class="admin-tab" data-tab="events">
+                <i class="fas fa-calendar-alt"></i> Events
+            </button>
+            <button class="admin-tab" data-tab="news">
+                <i class="fas fa-newspaper"></i> News
+            </button>
+            <button class="admin-tab" data-tab="publications">
+                <i class="fas fa-book"></i> Publications
+            </button>
+            <button class="admin-tab" data-tab="quotes">
+                <i class="fas fa-quote-left"></i> Quotes
+            </button>
+        </div>
+        
+        <!-- Testimonials Tab -->
+        <div class="admin-content active" id="testimonials-tab">
+            <div class="admin-card">
+                <h2>Add New Testimonial</h2>
+                <div id="testimonial-alert"></div>
+                <form id="testimonial-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="testimonial-name">Name *</label>
+                            <input type="text" id="testimonial-name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="testimonial-role">Role/Title *</label>
+                            <input type="text" id="testimonial-role" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="testimonial-quote">Testimonial Text *</label>
+                        <textarea id="testimonial-quote" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="testimonial-tags">Tags (comma-separated)</label>
+                        <input type="text" id="testimonial-tags" placeholder="e.g., Widows' Voices, Economic Empowerment">
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Testimonial
+                    </button>
+                </form>
+            </div>
+            
+            <div class="admin-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                    <h2 style="margin: 0;">Existing Testimonials</h2>
+                    <div class="admin-search-wrapper">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="testimonials-search" class="admin-search-input" placeholder="Search by name, role, quote, or tags...">
+                    </div>
+                </div>
+                <div id="testimonials-list" class="items-list"></div>
+            </div>
+        </div>
+        
+        <!-- Photos Tab -->
+        <div class="admin-content" id="photos-tab">
+            <div class="admin-card">
+                <h2>Upload Photo</h2>
+                <div id="photo-alert"></div>
+                <form id="photo-form">
+                    <div class="form-group">
+                        <label for="photo-title">Photo Title *</label>
+                        <input type="text" id="photo-title" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="photo-description">Description</label>
+                        <textarea id="photo-description"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="photo-url">Photo URL</label>
+                        <input type="url" id="photo-url" placeholder="https://hopealife.org/images/...">
+                        <small style="color: var(--text-secondary); margin-top: 0.5rem; display: block;">Or upload from local: <input type="file" id="photo-file" accept="image/*" style="margin-top: 0.5rem;"></small>
+                    </div>
+                    <div class="form-group">
+                        <label for="photo-alt">Alt Text</label>
+                        <input type="text" id="photo-alt" placeholder="Description for accessibility">
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-upload"></i> Add Photo
+                    </button>
+                </form>
+            </div>
+            
+            <div class="admin-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                    <h2 style="margin: 0;">Photo Gallery</h2>
+                    <div class="admin-search-wrapper">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="photos-search" class="admin-search-input" placeholder="Search by title, description, or alt text...">
+                    </div>
+                </div>
+                <div id="photos-list" class="items-list"></div>
+            </div>
+        </div>
+        
+        <!-- Videos Tab -->
+        <div class="admin-content" id="videos-tab">
+            <div class="admin-card">
+                <h2>Add Video</h2>
+                <div id="video-alert"></div>
+                <form id="video-form">
+                    <div class="form-group">
+                        <label for="video-title">Video Title *</label>
+                        <input type="text" id="video-title" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="video-description">Description</label>
+                        <textarea id="video-description"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="video-url">Video URL (YouTube/Vimeo) *</label>
+                        <input type="url" id="video-url" required placeholder="https://youtube.com/watch?v=...">
+                    </div>
+                    <div class="form-group">
+                        <label for="video-thumbnail">Thumbnail URL</label>
+                        <input type="url" id="video-thumbnail" placeholder="https://hopealife.org/images/...">
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-video"></i> Add Video
+                    </button>
+                </form>
+            </div>
+            
+            <div class="admin-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                    <h2 style="margin: 0;">Video Library</h2>
+                    <div class="admin-search-wrapper">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="videos-search" class="admin-search-input" placeholder="Search by title, description, or URL...">
+                    </div>
+                </div>
+                <div id="videos-list" class="items-list"></div>
+            </div>
+        </div>
+        
+        <!-- Comments Tab -->
+        <div class="admin-content" id="comments-tab">
+            <div class="admin-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                    <h2 style="margin: 0;">Manage Comments</h2>
+                    <div class="admin-search-wrapper">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="comments-search" class="admin-search-input" placeholder="Search by name, email, or comment...">
+                    </div>
+                </div>
+                <div id="comments-list" class="items-list"></div>
+            </div>
+        </div>
+        
+        <!-- Pending Stories Tab -->
+        <div class="admin-content" id="pending-stories-tab">
+            <div class="admin-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                    <h2 style="margin: 0;">Pending Story Submissions</h2>
+                    <div class="admin-search-wrapper">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="pending-stories-search" class="admin-search-input" placeholder="Search by name, email, title, story, or location...">
+                    </div>
+                </div>
+                <p style="text-align: center; color: var(--text-secondary); margin-bottom: 1.5rem;">Review and approve user-submitted stories of transformation</p>
+                <div id="pending-stories-list" class="items-list"></div>
+            </div>
+        </div>
+        
+        <!-- Events Tab -->
+        <div class="admin-content" id="events-tab">
+            <div class="admin-card">
+                <h2>Create New Event</h2>
+                <div id="event-alert"></div>
+                <form id="event-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="event-title">Event Title *</label>
+                            <input type="text" id="event-title" required placeholder="e.g., Widows' Empowerment Workshop">
+                        </div>
+                        <div class="form-group">
+                            <label for="event-date">Event Date *</label>
+                            <input type="date" id="event-date" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="event-time">Event Time</label>
+                            <input type="time" id="event-time">
+                        </div>
+                        <div class="form-group">
+                            <label for="event-location">Location *</label>
+                            <input type="text" id="event-location" required placeholder="e.g., Nairobi, Kenya">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="event-description">Description *</label>
+                        <textarea id="event-description" rows="4" required placeholder="Join us for a workshop to equip widows with skills..."></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="event-venue">Venue Details</label>
+                            <input type="text" id="event-venue" placeholder="Specific venue address or building name">
+                        </div>
+                        <div class="form-group">
+                            <label for="event-contact-name">Contact Person Name</label>
+                            <input type="text" id="event-contact-name" placeholder="Name of event coordinator">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="event-contact-email">Contact Email</label>
+                            <input type="email" id="event-contact-email" placeholder="coordinator@hopealife.org">
+                        </div>
+                        <div class="form-group">
+                            <label for="event-contact-phone">Contact Phone</label>
+                            <input type="tel" id="event-contact-phone" placeholder="+254 792 339 752">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="event-image">Event Image URL</label>
+                        <input type="url" id="event-image" placeholder="https://hopealife.org/images/events/...">
+                        <small style="color: var(--text-secondary); margin-top: 0.5rem; display: block;">Or upload from local: <input type="file" id="event-image-file" accept="image/*" style="margin-top: 0.5rem;"></small>
+                    </div>
+                    <div class="form-group">
+                        <label for="event-registration-link">Registration Link (Optional)</label>
+                        <input type="url" id="event-registration-link" placeholder="https://...">
+                    </div>
+                    <div class="form-group">
+                        <label for="event-documents">Event Documents (Optional)</label>
+                        <input type="file" id="event-documents" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.zip,.rar">
+                        <small style="color: var(--text-secondary); margin-top: 0.5rem; display: block;">
+                            Upload brochures, flyers, or other event documents. Supported formats: PDF, Word, Excel, PowerPoint, Images, ZIP, RAR
+                        </small>
+                        <div id="event-documents-preview" style="margin-top: 1rem;"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="event-max-attendees">Maximum Total Attendees *</label>
+                            <input type="number" id="event-max-attendees" min="1" required placeholder="e.g., 100">
+                            <small style="color: var(--text-secondary); margin-top: 0.5rem; display: block;">Total capacity for this event</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="event-max-org-attendees">Max Attendees per Organization</label>
+                            <input type="number" id="event-max-org-attendees" min="1" placeholder="e.g., 10">
+                            <small style="color: var(--text-secondary); margin-top: 0.5rem; display: block;">Leave empty for no limit</small>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="event-featured"> Feature on Homepage
+                        </label>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-calendar-plus"></i> Create Event
+                    </button>
+                </form>
+            </div>
+            
+            <div class="admin-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                    <h2 style="margin: 0;">Manage Events</h2>
+                    <div class="admin-search-wrapper">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="events-search" class="admin-search-input" placeholder="Search by title, description, or location...">
+                    </div>
+                </div>
+                <div id="events-list" class="items-list"></div>
+            </div>
+            
+            <div class="admin-card">
+                <h2>Event Registrations</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">View registrants for live events and export attendance lists.</p>
+                <div id="event-registrations-container">
+                    <p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Select a live event above to view registrants.</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- News Tab -->
+        <div class="admin-content" id="news-tab">
+            <div class="admin-card">
+                <h2>Create News Article</h2>
+                <div id="news-alert"></div>
+                <form id="news-form">
+                    <div class="form-group">
+                        <label for="news-title">News Title *</label>
+                        <input type="text" id="news-title" required placeholder="e.g., New Partnership Announced">
+                    </div>
+                    <div class="form-group">
+                        <label for="news-content">Content *</label>
+                        <textarea id="news-content" rows="6" required placeholder="Write the news article content here..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="news-image">Featured Image URL</label>
+                        <input type="url" id="news-image" placeholder="https://hopealife.org/images/news/...">
+                    </div>
+                    <div class="form-group">
+                        <label for="news-link">External Link (Optional)</label>
+                        <input type="url" id="news-link" placeholder="Link to full article or source">
+                    </div>
+                    <div class="form-group">
+                        <label for="news-source">Source</label>
+                        <select id="news-source">
+                            <option value="publication">From Publication</option>
+                            <option value="story">From Story of Transformation</option>
+                            <option value="admin">Admin Created</option>
+                            <option value="user">User Submitted</option>
+                            <option value="wordpress">WordPress</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-newspaper"></i> Publish News
+                    </button>
+                </form>
+            </div>
+            
+            <div class="admin-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                    <h2 style="margin: 0;">Pending News Submissions</h2>
+                    <div class="admin-search-wrapper">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="pending-news-search" class="admin-search-input" placeholder="Search by title, content, or author...">
+                    </div>
+                </div>
+                <div id="pending-news-list" class="items-list"></div>
+            </div>
+            
+            <div class="admin-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                    <h2 style="margin: 0;">Published News</h2>
+                    <div class="admin-search-wrapper">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="news-search" class="admin-search-input" placeholder="Search by title, content, or author...">
+                    </div>
+                </div>
+                <div id="news-list" class="items-list"></div>
+            </div>
+        </div>
+        
+        <!-- Publications Tab -->
+        <div class="admin-content" id="quotes-tab">
+            <div class="admin-card">
+                <h2>Manage Quotes of the Day</h2>
+                <p>Add, edit, and schedule quotes that will automatically display on the contact page.</p>
+                
+                <div class="form-group">
+                    <label for="quote-text-input">Quote Text *</label>
+                    <textarea id="quote-text-input" rows="3" placeholder="Enter an inspiring quote..." required></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="quote-author-input">Author (Optional)</label>
+                    <input type="text" id="quote-author-input" placeholder="Quote author name">
+                </div>
+                
+                <div class="form-group">
+                    <label for="quote-date-input">Schedule Date (Optional)</label>
+                    <input type="date" id="quote-date-input">
+                    <small>Leave empty to use immediately. Set a date to schedule for a specific day.</small>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-primary" onclick="saveQuote()">
+                        <i class="fas fa-save"></i> Save Quote
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="clearQuoteForm()">
+                        <i class="fas fa-times"></i> Clear
+                    </button>
+                </div>
+            </div>
+            
+            <div class="admin-card">
+                <h3>Existing Quotes</h3>
+                <div id="quotes-list" class="quotes-list">
+                    <p class="empty-state">No quotes added yet. Add your first quote above.</p>
+                </div>
+            </div>
+            
+            <!-- Verses Section -->
+            <div class="admin-card" style="margin-top: 2rem;">
+                <h2>Manage Verses of the Day</h2>
+                <p>Add, edit, and schedule Bible verses that will automatically display on the contact page.</p>
+                
+                <div class="form-group">
+                    <label for="verse-text-input">Verse Text *</label>
+                    <textarea id="verse-text-input" rows="3" placeholder="Enter the Bible verse text..." required></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="verse-reference-input">Reference (Optional)</label>
+                    <input type="text" id="verse-reference-input" placeholder="e.g., Jeremiah 29:11">
+                </div>
+                
+                <div class="form-group">
+                    <label for="verse-date-input">Schedule Date (Optional)</label>
+                    <input type="date" id="verse-date-input">
+                    <small>Leave empty to use immediately. Set a date to schedule for a specific day.</small>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-primary" onclick="saveVerse()">
+                        <i class="fas fa-save"></i> Save Verse
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="clearVerseForm()">
+                        <i class="fas fa-times"></i> Clear
+                    </button>
+                </div>
+            </div>
+            
+            <div class="admin-card">
+                <h3>Existing Verses</h3>
+                <div id="verses-list" class="quotes-list">
+                    <p class="empty-state">No verses added yet. Add your first verse above.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="admin-content" id="publications-tab">
+            <div class="admin-card">
+                <h2>Create Publication</h2>
+                <div id="publication-alert"></div>
+                <form id="publication-form">
+                    <div class="form-group">
+                        <label for="publication-title">Title *</label>
+                        <input type="text" id="publication-title" required placeholder="e.g., Annual Impact Report 2024">
+                    </div>
+                    <div class="form-group">
+                        <label for="publication-content">Content *</label>
+                        <textarea id="publication-content" rows="8" required placeholder="Write the publication content here. You can include multiple paragraphs..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="publication-author">Author</label>
+                        <input type="text" id="publication-author" placeholder="Author name">
+                    </div>
+                    <div class="form-group">
+                        <label for="publication-date">Publication Date</label>
+                        <input type="date" id="publication-date">
+                    </div>
+                    <div class="form-group">
+                        <label>Upload Images</label>
+                        <input type="file" id="publication-images" multiple accept="image/*">
+                        <small style="color: var(--text-secondary); margin-top: 0.5rem; display: block;">You can select multiple images</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Upload Videos</label>
+                        <input type="file" id="publication-videos" multiple accept="video/*">
+                        <small style="color: var(--text-secondary); margin-top: 0.5rem; display: block;">Or add video URLs: <input type="url" id="publication-video-urls" placeholder="Comma-separated video URLs" style="margin-top: 0.5rem; width: 100%; padding: 0.5rem;"></small>
+                    </div>
+                    <div class="form-group">
+                        <label for="wordpress-url">WordPress URL (Optional)</label>
+                        <input type="url" id="wordpress-url" placeholder="https://yourwordpress.com/wp-json/wp/v2/posts/...">
+                        <small style="color: var(--text-secondary); margin-top: 0.5rem; display: block;">Enter WordPress REST API endpoint to fetch content</small>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-book"></i> Publish
+                    </button>
+                </form>
+            </div>
+            
+            <div class="admin-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                    <h2 style="margin: 0;">Publications Library</h2>
+                    <div class="admin-search-wrapper">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="publications-search" class="admin-search-input" placeholder="Search by title, description, or author...">
+                    </div>
+                </div>
+                <div id="publications-list" class="items-list"></div>
+            </div>
+        </div>
+    </div>
+    </div>
+    
+    <script>
+        // Keyword Gate Protection
+        (function() {
+            const keyword = "supersecret123"; // Change this to your desired keyword
+            
+            // Prompt for keyword on page load
+            const entered = prompt("Enter keyword to access admin:");
+            
+            if (entered === keyword) {
+                // Show admin content after DOM is ready
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', function() {
+                        const adminDiv = document.getElementById("admin");
+                        if (adminDiv) {
+                            adminDiv.style.display = "block";
+                        }
+                    });
+                } else {
+                    const adminDiv = document.getElementById("admin");
+                    if (adminDiv) {
+                        adminDiv.style.display = "block";
+                    }
+                }
+            } else {
+                // Show 404 page (user cancelled or wrong password)
+                document.documentElement.innerHTML = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>404 - Page Not Found</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;display:flex;align-items:center;justify-content:center;color:white;text-align:center;padding:2rem}.error-container{max-width:600px}h1{font-size:8rem;font-weight:900;margin-bottom:1rem;text-shadow:0 10px 30px rgba(0,0,0,0.3)}h2{font-size:2rem;margin-bottom:1rem;font-weight:600}p{font-size:1.2rem;opacity:0.9;margin-bottom:2rem;line-height:1.6}a{display:inline-block;padding:1rem 2rem;background:rgba(255,255,255,0.2);color:white;text-decoration:none;border-radius:8px;transition:all 0.3s ease;backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.3)}a:hover{background:rgba(255,255,255,0.3);transform:translateY(-2px)}</style></head><body><div class="error-container"><h1>404</h1><h2>Page Not Found</h2><p>The page you are looking for does not exist or has been moved.</p><a href="index.html">Return to Homepage</a></div></body></html>';
+            }
+        })();
+    </script>
+    <script src="assets/js/admin.js"></script>
+</body>
+</html>
+

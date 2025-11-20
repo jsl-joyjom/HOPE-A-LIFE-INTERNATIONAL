@@ -1,0 +1,1304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Support Hope A Life International - Make a secure donation to help widows, orphans, and vulnerable communities in Kenya.">
+    <title>Donate | Hope A Life International</title>
+    <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="assets/css/main.css">
+    <style>
+        .donate-hero {
+            background: linear-gradient(135deg, var(--navy-blue) 0%, var(--primary-blue) 100%);
+            padding: clamp(4rem, 8vw + 2rem, 6rem) 0 clamp(2rem, 4vw + 1rem, 3rem);
+            text-align: center;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .donate-hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('https://hopealife.org/images/front1.jpg') no-repeat center center/cover;
+            opacity: 0.15;
+            z-index: 0;
+        }
+
+        .donate-hero-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .donate-hero-logo {
+            width: 200px;
+            height: auto;
+            margin: 0 auto 2rem;
+            display: block;
+            filter: brightness(0) invert(1);
+        }
+
+        .donate-hero h1 {
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            margin-bottom: 1rem;
+            font-weight: 700;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .donate-hero p {
+            font-size: clamp(1.1rem, 2vw + 0.5rem, 1.4rem);
+            max-width: 750px;
+            margin: 0 auto;
+            line-height: 1.6;
+            opacity: 0.95;
+            text-align: center;
+        }
+
+        .donate-section {
+            padding: clamp(3rem, 6vw + 2rem, 5rem) 0;
+            background: var(--light-gray);
+        }
+
+        .donate-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 clamp(1rem, 3vw, 2rem);
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3rem;
+            align-items: start;
+        }
+
+        .donate-form-card {
+            background: white;
+            border-radius: 20px;
+            padding: clamp(2rem, 4vw, 3rem);
+            box-shadow: 0 10px 40px rgba(30, 58, 138, 0.1);
+            position: sticky;
+            top: 100px;
+        }
+
+        .donate-info-card {
+            background: white;
+            border-radius: 20px;
+            padding: clamp(2rem, 4vw, 3rem);
+            box-shadow: 0 10px 40px rgba(30, 58, 138, 0.1);
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--navy-blue);
+            font-size: 0.95rem;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-family: 'Raleway', sans-serif;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+        }
+
+        .amount-buttons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .amount-btn {
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            background: white;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.95rem;
+        }
+
+        .amount-btn:hover {
+            border-color: var(--primary-blue);
+            background: var(--light-blue);
+            color: var(--primary-blue);
+        }
+
+        .amount-btn.active {
+            border-color: var(--primary-blue);
+            background: var(--primary-blue);
+            color: white;
+        }
+
+        .payment-methods {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .payment-method {
+            padding: 1.5rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+            background: white;
+        }
+
+        .payment-method:hover {
+            border-color: var(--primary-blue);
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.15);
+        }
+
+        .payment-method.active {
+            border-color: var(--primary-blue);
+            background: var(--light-blue);
+        }
+
+        .payment-method-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.75rem;
+            color: var(--primary-blue);
+        }
+
+        .payment-method-name {
+            font-weight: 600;
+            color: var(--navy-blue);
+            font-size: 0.95rem;
+        }
+
+        .donate-btn {
+            width: 100%;
+            padding: 0.85rem 1.5rem;
+            background: linear-gradient(135deg, #ffd166 0%, #fca311 45%, #ff4d6d 100%);
+            color: #0b1222;
+            border: none;
+            border-radius: 999px;
+            font-size: 0.9rem;
+            font-weight: 800;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: transform 0.3s ease, box-shadow 0.3s ease, filter 0.3s ease;
+            margin-top: 2rem;
+            box-shadow: 0 8px 24px rgba(252, 163, 17, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+            position: relative;
+            overflow: hidden;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .donate-btn i {
+            color: #0b1222;
+            filter: drop-shadow(0 2px 6px rgba(0,0,0,0.2));
+        }
+
+        .donate-btn::after {
+            content: '';
+            position: absolute;
+            left: -30%;
+            top: 0;
+            width: 30%;
+            height: 100%;
+            background: linear-gradient(115deg, rgba(255,255,255,0.65), rgba(255,255,255,0));
+            transform: skewX(-20deg);
+            opacity: 0;
+            transition: opacity 0.3s ease, left 0.5s ease;
+        }
+
+        .donate-btn:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 14px 36px rgba(252, 163, 17, 0.45), 0 18px 50px rgba(255, 77, 109, 0.35);
+            filter: saturate(1.05);
+        }
+
+        .donate-btn:hover::after {
+            left: 120%;
+            opacity: 1;
+        }
+
+        .donate-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            filter: none;
+        }
+
+        .donate-btn:disabled::after {
+            display: none;
+        }
+
+        .info-section {
+            margin-bottom: 2rem;
+        }
+
+        .info-section h3 {
+            color: var(--navy-blue);
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .info-section h3 i {
+            color: var(--primary-blue);
+        }
+
+        .info-section p {
+            color: var(--text-light);
+            line-height: 1.7;
+            margin-bottom: 1rem;
+        }
+
+        .impact-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .impact-stat {
+            background: linear-gradient(135deg, var(--primary-blue), var(--sky-blue));
+            color: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .impact-stat-number {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .impact-stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .security-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: var(--light-blue);
+            border-radius: 10px;
+            color: var(--navy-blue);
+            font-size: 0.9rem;
+        }
+
+        .security-badge i {
+            color: var(--primary-blue);
+            font-size: 1.25rem;
+        }
+
+        .comment-section {
+            margin-top: 1.5rem;
+        }
+
+        .comment-section textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .tag-section {
+            margin-top: 1rem;
+        }
+
+        .tag-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .tag-btn {
+            padding: 6px 12px;
+            border: 1px solid #e5e7eb;
+            background: white;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .tag-btn:hover {
+            border-color: var(--primary-blue);
+            color: var(--primary-blue);
+        }
+
+        .tag-btn.active {
+            background: var(--primary-blue);
+            color: white;
+            border-color: var(--primary-blue);
+        }
+
+        @media (max-width: 968px) {
+            .donate-container {
+                grid-template-columns: 1fr;
+            }
+
+            .donate-form-card {
+                position: static;
+            }
+
+            .amount-buttons {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .payment-methods {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Processing Modal */
+        .payment-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(5px);
+            z-index: 10000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .payment-modal.active {
+            display: flex;
+        }
+
+        .payment-modal-content {
+            background: white;
+            border-radius: 24px;
+            padding: 3rem;
+            max-width: 450px;
+            width: 90%;
+            box-shadow: 0 25px 70px rgba(0, 0, 0, 0.4);
+            text-align: center;
+            animation: slideUp 0.4s ease;
+        }
+
+        #success-modal .payment-modal-content {
+            max-width: 700px;
+            width: 95%;
+            padding: clamp(3rem, 6vw + 2rem, 5rem) clamp(2rem, 4vw, 3rem);
+            min-height: 85vh;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow-y: auto;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .processing-animation {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 2rem;
+            position: relative;
+        }
+
+        .processing-circle {
+            width: 100%;
+            height: 100%;
+            border: 4px solid var(--light-blue);
+            border-top-color: var(--primary-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .processing-arrows {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60px;
+            height: 60px;
+        }
+
+        .arrow {
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-style: solid;
+        }
+
+        .arrow-1 {
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-bottom: 12px solid var(--primary-blue);
+            animation: arrowPulse 1.5s ease-in-out infinite;
+        }
+
+        .arrow-2 {
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            border-top: 8px solid transparent;
+            border-bottom: 8px solid transparent;
+            border-left: 12px solid var(--primary-blue);
+            animation: arrowPulse 1.5s ease-in-out infinite 0.2s;
+        }
+
+        .arrow-3 {
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-top: 12px solid var(--primary-blue);
+            animation: arrowPulse 1.5s ease-in-out infinite 0.4s;
+        }
+
+        .arrow-4 {
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            border-top: 8px solid transparent;
+            border-bottom: 8px solid transparent;
+            border-right: 12px solid var(--primary-blue);
+            animation: arrowPulse 1.5s ease-in-out infinite 0.6s;
+        }
+
+        @keyframes arrowPulse {
+            0%, 100% {
+                opacity: 0.3;
+                transform: translate(-50%, -50%) scale(0.8);
+            }
+            50% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1.2);
+            }
+        }
+
+        .processing-text {
+            color: var(--navy-blue);
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .processing-subtext {
+            color: var(--text-light);
+            font-size: 1rem;
+            line-height: 1.6;
+        }
+
+        /* Success Modal */
+        .success-animation {
+            width: 150px;
+            height: 150px;
+            margin: 0 auto 2.5rem;
+            position: relative;
+        }
+
+        .success-circle {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #10b981, #059669);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: scaleIn 0.5s ease;
+            box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4);
+        }
+
+        @keyframes scaleIn {
+            0% {
+                transform: scale(0);
+                opacity: 0;
+            }
+            50% {
+                transform: scale(1.1);
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .success-check {
+            color: white;
+            font-size: 5rem;
+            animation: checkMark 0.6s ease 0.3s both;
+        }
+
+        @keyframes checkMark {
+            0% {
+                transform: scale(0) rotate(-45deg);
+                opacity: 0;
+            }
+            50% {
+                transform: scale(1.2) rotate(-45deg);
+            }
+            100% {
+                transform: scale(1) rotate(0deg);
+                opacity: 1;
+            }
+        }
+
+        .success-text {
+            color: var(--navy-blue);
+            font-size: clamp(2rem, 4vw, 2.5rem);
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+        }
+
+        .success-message {
+            color: var(--text-light);
+            font-size: clamp(1.1rem, 2vw + 0.5rem, 1.3rem);
+            line-height: 1.8;
+            margin-bottom: 2.5rem;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .success-amount {
+            background: linear-gradient(135deg, var(--light-blue), rgba(14, 165, 233, 0.1));
+            padding: 2rem;
+            border-radius: 20px;
+            margin-bottom: 2.5rem;
+            width: 100%;
+            max-width: 400px;
+            border: 2px solid rgba(14, 165, 233, 0.2);
+        }
+
+        .success-amount-label {
+            font-size: 1rem;
+            color: var(--text-light);
+            margin-bottom: 0.75rem;
+            font-weight: 600;
+        }
+
+        .success-amount-value {
+            font-size: clamp(2.5rem, 5vw, 3.5rem);
+            font-weight: 700;
+            color: var(--primary-blue);
+        }
+
+        .modal-close-btn {
+            background: linear-gradient(135deg, var(--primary-blue), var(--sky-blue));
+            color: white;
+            border: none;
+            padding: 18px 52px;
+            border-radius: 999px;
+            font-weight: 700;
+            font-size: 1.15rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+            letter-spacing: 0.5px;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .modal-close-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(14, 165, 233, 0.4);
+        }
+
+        .modal-close-btn i {
+            font-size: 1.25rem;
+        }
+
+        @media (max-width: 640px) {
+            #success-modal .payment-modal-content {
+                min-height: 85vh;
+                padding: 3rem 2rem;
+            }
+
+            .success-animation {
+                width: 120px;
+                height: 120px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    
+    <div class="progress-bar" role="presentation">
+        <div class="progress-fill"></div>
+    </div>
+
+    <header>
+        <div class="container">
+            <nav>
+                <div class="logo-container">
+                    <img src="https://hopealife.org/images/logo.png" alt="Hope A Life International Logo" class="logo-img">
+                    <span class="nav-slogan">Hope starts with you</span>
+                </div>
+                <ul class="nav-links" id="primary-navigation" aria-hidden="true">
+                    <button class="nav-collapse" type="button" aria-label="Close navigation">
+                        <i class="fas fa-angle-right" aria-hidden="true"></i>
+                    </button>
+                    <li><a href="index.html" aria-label="Home">Home</a></li>
+                    <li class="dropdown">
+                        <a href="#" aria-label="About">About</a>
+                        <ul class="dropdown-menu">
+                            <li><a href="about.html" aria-label="About us">About Us</a></li>
+                            <li><a href="team.html" aria-label="Our team">Our Team</a></li>
+                        </ul>
+                    </li>
+                    <li><a href="our-programs.html" aria-label="Our programs">Our Programs</a></li>
+                    <li><a href="impact.html" aria-label="Our impact">Our Impact</a></li>
+                    <li><a href="events.html" aria-label="Events">Events</a></li>
+                    <li class="dropdown">
+                        <a href="#" aria-label="Media">Media</a>
+                        <ul class="dropdown-menu">
+                            <li><a href="gallery.html">Photo Gallery</a></li>
+                            <li><a href="video.html">Video Gallery</a></li>
+                            <li><a href="articles.html">Publications</a></li>
+                            <li><a href="latestnews.html">News</a></li>
+                        </ul>
+                    </li>
+                    <li><a href="partners.html" aria-label="Partners">Partners</a></li>
+                    <li><a href="contacts.html" aria-label="Contact us">Contact Us</a></li>
+                    <li class="nav-sidebar-footer">
+                        <img src="https://hopealife.org/images/logo.png" alt="Hope A Life International Logo" class="nav-sidebar-logo">
+                    </li>
+                </ul>
+                <div class="nav-actions">
+                    <button class="hamburger" type="button" aria-label="Toggle navigation menu" aria-controls="primary-navigation" aria-expanded="false">
+                        <span class="hamburger-line"></span>
+                        <span class="hamburger-line"></span>
+                        <span class="hamburger-line"></span>
+                    </button>
+                    <a href="donate.html" class="nav-donate" aria-label="Donate to Hope A Life International">
+                        <i class="fas fa-heart" aria-hidden="true"></i>
+                        <span>Donate</span>
+                    </a>
+                    <button class="theme-toggle" type="button" aria-label="Toggle dark mode" title="Toggle dark mode">
+                        <i class="fas fa-moon" aria-hidden="true"></i>
+                        <i class="fas fa-sun" aria-hidden="true" style="display: none;"></i>
+                        <span class="sr-only">Toggle dark mode</span>
+                    </button>
+                </div>
+            </nav>
+        </div>
+        <button class="header-collapse" type="button" aria-label="Collapse header" aria-pressed="false" title="Collapse header">
+            <i class="fas fa-chevron-up" aria-hidden="true"></i>
+            <span class="sr-only">Collapse header</span>
+        </button>
+        <div class="nav-overlay" aria-hidden="true"></div>
+    </header>
+
+    <main id="main-content">
+        <section class="donate-hero">
+            <div class="container">
+                <div class="donate-hero-content">
+                    <img src="https://hopealife.org/images/logo.png" alt="Hope A Life International Logo" class="donate-hero-logo">
+                    <h1>Make a Difference Today</h1>
+                    <p>Your donation helps us restore dignity and hope to widows, orphans, and vulnerable communities across Kenya. Every contribution makes a lasting impact.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="donate-section">
+            <div class="donate-container">
+                <div class="donate-form-card">
+                    <h2 style="color: var(--navy-blue); margin-bottom: 2rem; font-size: 2rem;">Donate Now</h2>
+                    
+                    <form id="donate-form">
+                        <div class="form-group">
+                            <label for="donation-amount">Donation Amount (KES)</label>
+                            <div class="amount-buttons">
+                                <button type="button" class="amount-btn" data-amount="500">500</button>
+                                <button type="button" class="amount-btn" data-amount="1000">1,000</button>
+                                <button type="button" class="amount-btn" data-amount="2500">2,500</button>
+                                <button type="button" class="amount-btn" data-amount="5000">5,000</button>
+                            </div>
+                            <input type="number" id="donation-amount" name="amount" placeholder="Enter custom amount" min="100" step="100" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Choose Payment Method</label>
+                            <div class="payment-methods">
+                                <div class="payment-method" data-method="mpesa">
+                                    <div class="payment-method-icon"><i class="fas fa-mobile-alt"></i></div>
+                                    <div class="payment-method-name">M-Pesa</div>
+                                </div>
+                                <div class="payment-method" data-method="airtel">
+                                    <div class="payment-method-icon"><i class="fas fa-mobile-alt"></i></div>
+                                    <div class="payment-method-name">Airtel Money</div>
+                                </div>
+                                <div class="payment-method" data-method="paypal">
+                                    <div class="payment-method-icon"><i class="fab fa-paypal"></i></div>
+                                    <div class="payment-method-name">PayPal</div>
+                                </div>
+                                <div class="payment-method" data-method="card">
+                                    <div class="payment-method-icon"><i class="fas fa-credit-card"></i></div>
+                                    <div class="payment-method-name">Card</div>
+                                </div>
+                                <div class="payment-method" data-method="pesapal">
+                                    <div class="payment-method-icon"><i class="fas fa-wallet"></i></div>
+                                    <div class="payment-method-name">Pesapal</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="mpesa-fields" class="payment-fields" style="display: none;">
+                            <div class="form-group">
+                                <label for="mpesa-phone">M-Pesa Phone Number</label>
+                                <input type="tel" id="mpesa-phone" name="mpesa_phone" placeholder="07XX XXX XXX" pattern="[0-9]{10}" maxlength="10">
+                            </div>
+                        </div>
+
+                        <div id="airtel-fields" class="payment-fields" style="display: none;">
+                            <div class="form-group">
+                                <label for="airtel-phone">Airtel Money Phone Number</label>
+                                <input type="tel" id="airtel-phone" name="airtel_phone" placeholder="07XX XXX XXX" pattern="[0-9]{10}" maxlength="10">
+                            </div>
+                        </div>
+
+                        <div id="card-fields" class="payment-fields" style="display: none;">
+                            <div class="form-group">
+                                <label for="card-number">Card Number</label>
+                                <input type="text" id="card-number" name="card_number" placeholder="1234 5678 9012 3456" maxlength="19">
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                <div class="form-group">
+                                    <label for="card-expiry">Expiry Date</label>
+                                    <input type="text" id="card-expiry" name="card_expiry" placeholder="MM/YY" maxlength="5">
+                                </div>
+                                <div class="form-group">
+                                    <label for="card-cvv">CVV</label>
+                                    <input type="text" id="card-cvv" name="card_cvv" placeholder="123" maxlength="4">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="comment-section">
+                            <div class="form-group">
+                                <label for="donation-comment">Add a Comment (Optional)</label>
+                                <textarea id="donation-comment" name="comment" placeholder="Share why you're donating or leave a message of hope..."></textarea>
+                            </div>
+                        </div>
+
+                        <div class="tag-section">
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--navy-blue); font-size: 0.95rem;">Tag Your Donation (Optional)</label>
+                            <div class="tag-buttons">
+                                <button type="button" class="tag-btn" data-tag="widows">Widows Support</button>
+                                <button type="button" class="tag-btn" data-tag="orphans">Orphans Care</button>
+                                <button type="button" class="tag-btn" data-tag="education">Education</button>
+                                <button type="button" class="tag-btn" data-tag="healthcare">Healthcare</button>
+                                <button type="button" class="tag-btn" data-tag="emergency">Emergency Relief</button>
+                                <button type="button" class="tag-btn" data-tag="general">General Support</button>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="donate-btn" id="donate-submit">
+                            <i class="fas fa-heart" aria-hidden="true"></i>
+                            <span>Donate Now</span>
+                        </button>
+
+                        <div class="security-badge">
+                            <i class="fas fa-shield-alt"></i>
+                            <span>Your donation is secure and encrypted. We never store your payment details.</span>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="donate-info-card">
+                    <div class="info-section">
+                        <h3><i class="fas fa-heart"></i> Your Impact</h3>
+                        <p>Every donation directly supports our programs that empower widows, protect orphans, and transform vulnerable communities across Kenya.</p>
+                        <div class="impact-stats">
+                            <div class="impact-stat">
+                                <div class="impact-stat-number">62,000+</div>
+                                <div class="impact-stat-label">Widows Empowered</div>
+                            </div>
+                            <div class="impact-stat">
+                                <div class="impact-stat-number">5,000+</div>
+                                <div class="impact-stat-label">Orphans Supported</div>
+                            </div>
+                            <div class="impact-stat">
+                                <div class="impact-stat-number">145</div>
+                                <div class="impact-stat-label">Houses Built</div>
+                            </div>
+                            <div class="impact-stat">
+                                <div class="impact-stat-number">17</div>
+                                <div class="impact-stat-label">Years of Service</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="info-section">
+                        <h3><i class="fas fa-hand-holding-heart"></i> Ways to Get Involved</h3>
+                        <p><strong>Volunteer:</strong> Join us on the ground and make a direct impact in communities across Kenya.</p>
+                        <p><strong>Partner with Us:</strong> Organizations and businesses can collaborate on programs and initiatives.</p>
+                        <p><strong>Spread the Word:</strong> Share our mission with your network and help us reach more people in need.</p>
+                        <p><strong>Monthly Giving:</strong> Become a monthly donor to provide sustained support for our programs.</p>
+                        <p style="margin-top: 1rem;"><a href="contacts.html" style="color: var(--primary-blue); font-weight: 600; text-decoration: none;">Contact us to learn more →</a></p>
+                    </div>
+
+                    <div class="info-section">
+                        <h3><i class="fas fa-certificate"></i> Transparency</h3>
+                        <p>Hope A Life International is a registered charity organization in Kenya. We are committed to transparency and accountability in all our operations.</p>
+                        <p>All donations are used directly for program activities, with minimal administrative overhead.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Processing Modal -->
+    <div class="payment-modal" id="processing-modal">
+        <div class="payment-modal-content">
+            <div class="processing-animation">
+                <div class="processing-circle"></div>
+                <div class="processing-arrows">
+                    <div class="arrow arrow-1"></div>
+                    <div class="arrow arrow-2"></div>
+                    <div class="arrow arrow-3"></div>
+                    <div class="arrow arrow-4"></div>
+                </div>
+            </div>
+            <div class="processing-text">Processing Payment</div>
+            <div class="processing-subtext" id="processing-subtext">Please wait while we process your donation...</div>
+        </div>
+    </div>
+
+    <!-- Success Modal -->
+    <div class="payment-modal" id="success-modal">
+        <div class="payment-modal-content">
+            <div class="success-animation">
+                <div class="success-circle">
+                    <i class="fas fa-check success-check"></i>
+                </div>
+            </div>
+            <div class="success-text">Thank You!</div>
+            <div class="success-message">
+                Your generous donation helps us restore dignity and hope to widows, orphans, and vulnerable communities across Kenya. Together, we are making a lasting impact.
+            </div>
+            <div class="success-amount">
+                <div class="success-amount-label">Donation Amount</div>
+                <div class="success-amount-value" id="success-amount-display">KES 0</div>
+            </div>
+            <button class="modal-close-btn" onclick="closeSuccessModal()">
+                <i class="fas fa-check-circle" aria-hidden="true"></i>
+                <span>Continue</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer aria-label="Footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <div class="footer-logo">
+                        <img src="https://hopealife.org/images/logofooter.png" alt="Hope A Life International Footer Logo" class="footer-logo-img" loading="lazy">
+                        <h3></h3>
+                    </div>
+                    <p>A charitable organization dedicated to restoring dignity and hope to widows, orphans, and vulnerable communities. Registered in Kenya under the Societies Act since 2008.</p>
+                    <div class="footer-social">
+                        <a href="https://facebook.com/hopealifeint" aria-label="Facebook"><i class="fab fa-facebook-f"></i></a>
+                        <a href="https://twitter.com/hopealifeint" aria-label="Twitter"><i class="fab fa-twitter"></i></a>
+                        <a href="https://instagram.com/hopealifeint" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
+                        <a href="https://linkedin.com/company/hopealifeint" aria-label="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+                    </div>
+                </div>
+                <div class="footer-section">
+                    <h4>Our Programs</h4>
+                    <ul>
+                        <li><a href="our-programs.html#widows-voices" aria-label="Widows' Voices program">Widows' Voices</a></li>
+                        <li><a href="our-programs.html#orphans" aria-label="Orphans Projects">Orphans Projects</a></li>
+                        <li><a href="our-programs.html#fgm" aria-label="Fight Against FGM">Fight Against FGM</a></li>
+                        <li><a href="our-programs.html#early-marriage" aria-label="Against Early Marriage">Against Early Marriage</a></li>
+                        <li><a href="our-programs.html#gbv" aria-label="Against Gender-Based Violence">Against GBV</a></li>
+                        <li><a href="our-programs.html#disabilities" aria-label="Children with Disabilities">Children with Disabilities</a></li>
+                        <li><a href="our-programs.html#mentorship" aria-label="Girl Mentorship">Girl Mentorship</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Contact Information</h4>
+                    <ul>
+                        <li><a href="mailto:info@hopealife.org" aria-label="Email us">info@hopealife.org</a></li>
+                        <li><a href="tel:+254792339752" aria-label="Call us">+254 792 339 752</a></li>
+                        <li>Nyaku House, Room 107<br>Argwings Kodhek Road, Hurlingham<br>Nairobi, Kenya</li>
+                        <li><strong>Website:</strong> www.hopealife.org</li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Subscribe to Newsletter</h4>
+                    <p>Stay updated with our latest news, events, and impact stories.</p>
+                    <form class="newsletter-form">
+                        <input type="email" placeholder="Your email" required>
+                        <button type="submit">Subscribe</button>
+                    </form>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 Hope A Life International. All rights reserved. | Registered Charity Organization in Kenya</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="assets/js/main.js" defer></script>
+    <script>
+        // Ensure navigation works properly
+        document.addEventListener('DOMContentLoaded', function() {
+            // Navigation functionality is handled by main.js
+            // This ensures the donate page navigation matches other pages
+        });
+    </script>
+    <script>
+        // Amount button selection
+        document.querySelectorAll('.amount-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.amount-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                document.getElementById('donation-amount').value = this.dataset.amount;
+            });
+        });
+
+        // Payment method selection
+        let selectedMethod = '';
+        document.querySelectorAll('.payment-method').forEach(method => {
+            method.addEventListener('click', function() {
+                document.querySelectorAll('.payment-method').forEach(m => m.classList.remove('active'));
+                this.classList.add('active');
+                selectedMethod = this.dataset.method;
+                
+                // Hide all payment fields
+                document.querySelectorAll('.payment-fields').forEach(field => {
+                    field.style.display = 'none';
+                });
+                
+                // Show relevant fields
+                if (selectedMethod === 'mpesa') {
+                    document.getElementById('mpesa-fields').style.display = 'block';
+                } else if (selectedMethod === 'airtel') {
+                    document.getElementById('airtel-fields').style.display = 'block';
+                } else if (selectedMethod === 'card') {
+                    document.getElementById('card-fields').style.display = 'block';
+                }
+            });
+        });
+
+        // Tag selection
+        const selectedTags = [];
+        document.querySelectorAll('.tag-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                this.classList.toggle('active');
+                const tag = this.dataset.tag;
+                if (this.classList.contains('active')) {
+                    selectedTags.push(tag);
+                } else {
+                    const index = selectedTags.indexOf(tag);
+                    if (index > -1) selectedTags.splice(index, 1);
+                }
+            });
+        });
+
+        // Card number formatting
+        document.getElementById('card-number')?.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\s/g, '');
+            let formattedValue = value.match(/.{1,4}/g)?.join(' ') || value;
+            e.target.value = formattedValue;
+        });
+
+        // Card expiry formatting
+        document.getElementById('card-expiry')?.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length >= 2) {
+                value = value.substring(0, 2) + '/' + value.substring(2, 4);
+            }
+            e.target.value = value;
+        });
+
+        // Form submission
+        document.getElementById('donate-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const amount = document.getElementById('donation-amount').value;
+            const comment = document.getElementById('donation-comment').value;
+            
+            if (!amount || amount < 100) {
+                alert('Please enter a valid donation amount (minimum KES 100)');
+                return;
+            }
+            
+            if (!selectedMethod) {
+                alert('Please select a payment method');
+                return;
+            }
+            
+            // Handle different payment methods
+            if (selectedMethod === 'mpesa') {
+                const phone = document.getElementById('mpesa-phone').value;
+                if (!phone || phone.length !== 10) {
+                    alert('Please enter a valid M-Pesa phone number');
+                    return;
+                }
+                // Process M-Pesa payment
+                processMpesaPayment(phone, amount, comment, selectedTags);
+                
+            } else if (selectedMethod === 'airtel') {
+                const phone = document.getElementById('airtel-phone').value;
+                if (!phone || phone.length !== 10) {
+                    alert('Please enter a valid Airtel Money phone number');
+                    return;
+                }
+                // Process Airtel Money payment
+                processAirtelPayment(phone, amount, comment, selectedTags);
+                
+            } else if (selectedMethod === 'paypal') {
+                // Redirect to PayPal
+                window.open(`https://www.paypal.com/donate?hosted_button_id=YOUR_BUTTON_ID&amount=${amount}`, '_blank');
+                
+            } else if (selectedMethod === 'card') {
+                const cardNumber = document.getElementById('card-number').value.replace(/\s/g, '');
+                const expiry = document.getElementById('card-expiry').value;
+                const cvv = document.getElementById('card-cvv').value;
+                
+                if (!cardNumber || cardNumber.length < 16 || !expiry || !cvv) {
+                    alert('Please enter valid card details');
+                    return;
+                }
+                
+                // Simulate card payment
+                alert(`Card payment processing...\n\nAmount: KES ${amount}\n\nProcessing your donation. Please wait...`);
+                // In production, integrate with payment gateway (Stripe, etc.) here
+                
+            } else if (selectedMethod === 'pesapal') {
+                // Redirect to Pesapal
+                window.open(`https://store.pesapal.com/hopealife?amount=${amount}`, '_blank');
+            }
+            
+            // Log donation (in production, send to backend)
+            console.log('Donation Details:', {
+                amount,
+                method: selectedMethod,
+                comment,
+                tags: selectedTags
+            });
+        });
+
+        // Payment Processing Functions
+        async function processMpesaPayment(phone, amount, comment, tags) {
+            const submitBtn = document.getElementById('donate-submit');
+            const originalText = submitBtn.innerHTML;
+            
+            // Show processing modal
+            showProcessingModal('M-Pesa', phone);
+            
+            // Disable button
+            submitBtn.disabled = true;
+            
+            try {
+                // In production, this would call your backend API
+                // Example: const response = await fetch('/api/mpesa/stk-push', { ... });
+                
+                // Simulate API call (2-3 seconds)
+                await new Promise(resolve => setTimeout(resolve, 2500));
+                
+                // Hide processing modal and show success
+                hideProcessingModal();
+                showPaymentSuccess('M-Pesa', phone, amount);
+                
+                // In production, you would:
+                // 1. Send STK push request to M-Pesa API via your backend
+                // 2. The user receives prompt on their phone
+                // 3. User enters PIN on phone
+                // 4. Backend receives callback from M-Pesa
+                // 5. Show success/failure based on callback
+                
+                // Example backend API call (uncomment when backend is ready):
+                /*
+                const response = await fetch('/api/mpesa/stk-push', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        phoneNumber: phone,
+                        amount: amount,
+                        accountReference: 'HALI-DONATION',
+                        transactionDesc: 'Donation to Hope A Life International'
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    hideProcessingModal();
+                    showPaymentSuccess('M-Pesa', phone, amount);
+                } else {
+                    hideProcessingModal();
+                    alert('Payment failed: ' + data.message);
+                }
+                */
+                
+            } catch (error) {
+                console.error('Payment error:', error);
+                hideProcessingModal();
+                alert('An error occurred while processing your payment. Please try again.');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+        }
+
+        async function processAirtelPayment(phone, amount, comment, tags) {
+            const submitBtn = document.getElementById('donate-submit');
+            const originalText = submitBtn.innerHTML;
+            
+            // Show processing modal
+            showProcessingModal('Airtel Money', phone);
+            
+            submitBtn.disabled = true;
+            
+            try {
+                // Simulate API call
+                await new Promise(resolve => setTimeout(resolve, 2500));
+                
+                hideProcessingModal();
+                showPaymentSuccess('Airtel Money', phone, amount);
+                
+                // In production, integrate with Airtel Money API via backend
+                /*
+                const response = await fetch('/api/airtel/payment', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        phoneNumber: phone,
+                        amount: amount,
+                        reference: 'HALI-DONATION'
+                    })
+                });
+                */
+                
+            } catch (error) {
+                console.error('Payment error:', error);
+                hideProcessingModal();
+                alert('An error occurred while processing your payment. Please try again.');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+        }
+
+        function showProcessingModal(method, phone) {
+            const modal = document.getElementById('processing-modal');
+            const subtext = document.getElementById('processing-subtext');
+            subtext.textContent = `Sending ${method} payment request to ${phone}...`;
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function hideProcessingModal() {
+            const modal = document.getElementById('processing-modal');
+            modal.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        function showPaymentSuccess(method, phone, amount) {
+            const modal = document.getElementById('success-modal');
+            const amountDisplay = document.getElementById('success-amount-display');
+            amountDisplay.textContent = `KES ${parseInt(amount).toLocaleString()}`;
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeSuccessModal() {
+            const modal = document.getElementById('success-modal');
+            modal.classList.remove('active');
+            document.body.style.overflow = '';
+            resetDonationForm();
+        }
+
+        function resetDonationForm() {
+            document.getElementById('donate-form').reset();
+            document.querySelectorAll('.amount-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.payment-method').forEach(m => m.classList.remove('active'));
+            document.querySelectorAll('.payment-fields').forEach(f => f.style.display = 'none');
+            document.querySelectorAll('.tag-btn').forEach(t => t.classList.remove('active'));
+            selectedMethod = '';
+            selectedTags.length = 0;
+        }
+
+        // Close modals on outside click
+        document.getElementById('processing-modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                hideProcessingModal();
+            }
+        });
+
+        document.getElementById('success-modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeSuccessModal();
+            }
+        });
+
+        // Close on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                hideProcessingModal();
+                closeSuccessModal();
+            }
+        });
+    </script>
+</body>
+</html>
+
