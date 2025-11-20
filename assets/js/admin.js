@@ -2593,22 +2593,35 @@ function showEmailStatus(modal, type, message) {
 }
 
 // Quotes Management Functions
-function loadQuotes() {
-    const quotesList = document.getElementById('quotes-list');
-    if (!quotesList) return;
-    
-    const quotes = getQuotesFromStorage();
-    
-    if (quotes.length === 0) {
-        quotesList.innerHTML = '<p class="empty-state">No quotes added yet. Add your first quote above.</p>';
-        return;
-    }
-    
-    quotesList.innerHTML = quotes.map((quote, index) => {
-        const dateDisplay = quote.date ? new Date(quote.date).toLocaleDateString() : 'General (No date)';
-        const isScheduled = quote.date && new Date(quote.date) > new Date();
-        return `
-            <div class="quote-item" data-index="${index}">
+async function loadQuotes() {
+    try {
+        const quotesList = document.getElementById('quotes-list');
+        if (!quotesList) return;
+        
+        if (!window.supabase) {
+            quotesList.innerHTML = '<p class="empty-state">Database connection not available. Please refresh the page.</p>';
+            return;
+        }
+
+        const { data: quotes, error } = await window.supabase
+            .from('daily_quotes')
+            .select('*')
+            .order('date', { ascending: true, nullsFirst: true });
+        
+        if (error) throw error;
+        
+        const allQuotes = quotes || [];
+        
+        if (allQuotes.length === 0) {
+            quotesList.innerHTML = '<p class="empty-state">No quotes added yet. Add your first quote above.</p>';
+            return;
+        }
+        
+        quotesList.innerHTML = allQuotes.map((quote) => {
+            const dateDisplay = quote.date ? new Date(quote.date).toLocaleDateString() : 'General (No date)';
+            const isScheduled = quote.date && new Date(quote.date) > new Date();
+            return `
+            <div class="quote-item" data-id="${quote.id}">
                 <div class="quote-item-content">
                     <div class="quote-item-text">
                         <p>"${quote.text}"</p>
@@ -2621,92 +2634,223 @@ function loadQuotes() {
                     </div>
                 </div>
                 <div class="quote-item-actions">
-                    <button class="btn-icon" onclick="editQuote(${index})" title="Edit quote">
+                    <button class="btn-icon" onclick="editQuote(${quote.id})" title="Edit quote">
                         <i class="fas fa-edit"></i>
                     </button>
-                    <button class="btn-icon btn-danger" onclick="deleteQuote(${index})" title="Delete quote">
+                    <button class="btn-icon btn-danger" onclick="deleteQuote(${quote.id})" title="Delete quote">
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>
             </div>
         `;
-    }).join('');
+        }).join('');
+    } catch (error) {
+        console.error('Error loading quotes:', error);
+        const quotesList = document.getElementById('quotes-list');
+        if (quotesList) {
+            quotesList.innerHTML = '<p class="empty-state">Error loading quotes. Please try again.</p>';
+        }
+    }
 }
 
-function getQuotesFromStorage() {
+async function saveQuote() {
     try {
-        const quotes = localStorage.getItem('dailyQuotes');
-        return quotes ? JSON.parse(quotes) : [];
-    } catch (e) {
-        return [];
+        const textInput = document.getElementById('quote-text-input');
+        const authorInput = document.getElementById('quote-author-input');
+        const dateInput = document.getElementById('quote-date-input');
+        
+        if (!textInput || !textInput.value.trim()) {
+            alert('Please enter a quote text.');
+            return;
+        }
+        
+        // Check if we're editing (has data-editing-id attribute)
+        const editingId = textInput.getAttribute('data-editing-id');
+        if (editingId) {
+            return await updateQuote(parseInt(editingId));
+        }
+        
+        if (!window.supabase) {
+            alert('Database connection not available. Please refresh the page.');
+            return;
+        }
+
+        const quoteData = {
+            text: textInput.value.trim(),
+            author: authorInput && authorInput.value.trim() ? authorInput.value.trim() : null,
+            date: dateInput && dateInput.value ? dateInput.value : null
+        };
+        
+        const { error } = await window.supabase
+            .from('daily_quotes')
+            .insert([quoteData]);
+        
+        if (error) throw error;
+        
+        // Clear form
+        clearQuoteForm();
+        
+        // Reload quotes list
+        await loadQuotes();
+        
+        // Show success message
+        alert('Quote saved successfully!');
+        
+        // Dispatch event for frontend update
+        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'quotes' } }));
+        
+        // Also trigger storage event for cross-tab updates
+        try {
+            localStorage.setItem('quotes-updated', Date.now().toString());
+            localStorage.removeItem('quotes-updated');
+        } catch (e) {
+            // Ignore storage errors
+        }
+    } catch (error) {
+        console.error('Error saving quote:', error);
+        alert(`Error saving quote: ${error.message || 'Please try again.'}`);
     }
 }
 
-function saveQuotesToStorage(quotes) {
-    localStorage.setItem('dailyQuotes', JSON.stringify(quotes));
-}
+async function editQuote(quoteId) {
+    try {
+        if (!window.supabase) {
+            alert('Database connection not available. Please refresh the page.');
+            return;
+        }
 
-function saveQuote() {
-    const textInput = document.getElementById('quote-text-input');
-    const authorInput = document.getElementById('quote-author-input');
-    const dateInput = document.getElementById('quote-date-input');
-    
-    if (!textInput || !textInput.value.trim()) {
-        alert('Please enter a quote text.');
-        return;
+        const { data: quote, error: fetchError } = await window.supabase
+            .from('daily_quotes')
+            .select('*')
+            .eq('id', quoteId)
+            .single();
+        
+        if (fetchError || !quote) {
+            alert('Quote not found.');
+            return;
+        }
+        
+        const textInput = document.getElementById('quote-text-input');
+        const authorInput = document.getElementById('quote-author-input');
+        const dateInput = document.getElementById('quote-date-input');
+        
+        if (textInput) textInput.value = quote.text || '';
+        if (authorInput) authorInput.value = quote.author || '';
+        if (dateInput) dateInput.value = quote.date || '';
+        
+        // Store the ID being edited
+        if (textInput) textInput.setAttribute('data-editing-id', quoteId);
+        
+        // Scroll to form
+        if (textInput) textInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (textInput) textInput.focus();
+        
+        // Change save button to update
+        const saveBtn = document.querySelector('#quotes-tab button.btn-primary');
+        if (saveBtn) {
+            saveBtn.setAttribute('data-original-text', saveBtn.textContent);
+            saveBtn.innerHTML = '<i class="fas fa-save"></i> Update Quote';
+            saveBtn.onclick = () => updateQuote(quoteId);
+        }
+    } catch (error) {
+        console.error('Error loading quote for editing:', error);
+        alert(`Error: ${error.message || 'Please try again.'}`);
     }
-    
-    const quotes = getQuotesFromStorage();
-    const newQuote = {
-        text: textInput.value.trim(),
-        author: authorInput ? authorInput.value.trim() : '',
-        date: dateInput && dateInput.value ? dateInput.value : '',
-        createdAt: new Date().toISOString()
-    };
-    
-    quotes.push(newQuote);
-    saveQuotesToStorage(quotes);
-    
-    // Clear form
-    clearQuoteForm();
-    
-    // Reload quotes list
-    loadQuotes();
-    
-    // Show success message
-    alert('Quote saved successfully!');
 }
 
-function editQuote(index) {
-    const quotes = getQuotesFromStorage();
-    const quote = quotes[index];
-    
-    if (!quote) return;
-    
-    const textInput = document.getElementById('quote-text-input');
-    const authorInput = document.getElementById('quote-author-input');
-    const dateInput = document.getElementById('quote-date-input');
-    
-    if (textInput) textInput.value = quote.text;
-    if (authorInput) authorInput.value = quote.author || '';
-    if (dateInput) dateInput.value = quote.date || '';
-    
-    // Remove old quote and save new one
-    quotes.splice(index, 1);
-    saveQuotesToStorage(quotes);
-    
-    // Scroll to form
-    if (textInput) textInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    if (textInput) textInput.focus();
+async function updateQuote(quoteId) {
+    try {
+        const textInput = document.getElementById('quote-text-input');
+        const authorInput = document.getElementById('quote-author-input');
+        const dateInput = document.getElementById('quote-date-input');
+        
+        if (!textInput || !textInput.value.trim()) {
+            alert('Please enter a quote text.');
+            return;
+        }
+        
+        if (!window.supabase) {
+            alert('Database connection not available. Please refresh the page.');
+            return;
+        }
+
+        const quoteData = {
+            text: textInput.value.trim(),
+            author: authorInput && authorInput.value.trim() ? authorInput.value.trim() : null,
+            date: dateInput && dateInput.value ? dateInput.value : null
+        };
+        
+        const { error } = await window.supabase
+            .from('daily_quotes')
+            .update(quoteData)
+            .eq('id', quoteId);
+        
+        if (error) throw error;
+        
+        // Clear form
+        clearQuoteForm();
+        
+        // Reset save button
+        const saveBtn = document.querySelector('#quotes-tab button.btn-primary');
+        if (saveBtn && saveBtn.getAttribute('data-original-text')) {
+            saveBtn.innerHTML = saveBtn.getAttribute('data-original-text');
+            saveBtn.onclick = saveQuote;
+        }
+        
+        // Reload quotes list
+        await loadQuotes();
+        
+        // Show success message
+        alert('Quote updated successfully!');
+        
+        // Dispatch event for frontend update
+        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'quotes' } }));
+        
+        // Also trigger storage event for cross-tab updates
+        try {
+            localStorage.setItem('quotes-updated', Date.now().toString());
+            localStorage.removeItem('quotes-updated');
+        } catch (e) {
+            // Ignore storage errors
+        }
+    } catch (error) {
+        console.error('Error updating quote:', error);
+        alert(`Error updating quote: ${error.message || 'Please try again.'}`);
+    }
 }
 
-function deleteQuote(index) {
+async function deleteQuote(quoteId) {
     if (!confirm('Are you sure you want to delete this quote?')) return;
     
-    const quotes = getQuotesFromStorage();
-    quotes.splice(index, 1);
-    saveQuotesToStorage(quotes);
-    loadQuotes();
+    try {
+        if (!window.supabase) {
+            alert('Database connection not available. Please refresh the page.');
+            return;
+        }
+
+        const { error } = await window.supabase
+            .from('daily_quotes')
+            .delete()
+            .eq('id', quoteId);
+        
+        if (error) throw error;
+        
+        await loadQuotes();
+        
+        // Dispatch event for frontend update
+        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'quotes' } }));
+        
+        // Also trigger storage event for cross-tab updates
+        try {
+            localStorage.setItem('quotes-updated', Date.now().toString());
+            localStorage.removeItem('quotes-updated');
+        } catch (e) {
+            // Ignore storage errors
+        }
+    } catch (error) {
+        console.error('Error deleting quote:', error);
+        alert(`Error deleting quote: ${error.message || 'Please try again.'}`);
+    }
 }
 
 function clearQuoteForm() {
@@ -2714,9 +2858,19 @@ function clearQuoteForm() {
     const authorInput = document.getElementById('quote-author-input');
     const dateInput = document.getElementById('quote-date-input');
     
-    if (textInput) textInput.value = '';
+    if (textInput) {
+        textInput.value = '';
+        textInput.removeAttribute('data-editing-id');
+    }
     if (authorInput) authorInput.value = '';
     if (dateInput) dateInput.value = '';
+    
+    // Reset save button
+    const saveBtn = document.querySelector('#quotes-tab button.btn-primary');
+    if (saveBtn && saveBtn.getAttribute('data-original-text')) {
+        saveBtn.innerHTML = saveBtn.getAttribute('data-original-text');
+        saveBtn.onclick = saveQuote;
+    }
 }
 
 // Verses Management Functions

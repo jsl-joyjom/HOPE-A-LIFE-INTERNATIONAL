@@ -397,26 +397,65 @@
         // Quotes and Verses of the Day functionality
         let currentQuoteType = 'quote';
         
-        function getQuotesFromStorage() {
+        let cachedQuotes = [];
+        let cachedVerses = [];
+        
+        async function getQuotesFromSupabase() {
             try {
-                const quotes = localStorage.getItem('dailyQuotes');
-                return quotes ? JSON.parse(quotes) : [];
-            } catch (e) {
+                if (!window.supabase) {
+                    return [];
+                }
+                
+                const { data: quotes, error } = await window.supabase
+                    .from('daily_quotes')
+                    .select('*')
+                    .order('date', { ascending: true, nullsFirst: true });
+                
+                if (error) throw error;
+                
+                return (quotes || []).map(q => ({
+                    text: q.text,
+                    author: q.author,
+                    date: q.date
+                }));
+            } catch (error) {
+                console.error('Error loading quotes from Supabase:', error);
                 return [];
             }
         }
         
-        function getVersesFromStorage() {
+        async function getVersesFromSupabase() {
             try {
-                const verses = localStorage.getItem('dailyVerses');
-                return verses ? JSON.parse(verses) : [];
-            } catch (e) {
+                if (!window.supabase) {
+                    return [];
+                }
+                
+                const { data: verses, error } = await window.supabase
+                    .from('daily_verses')
+                    .select('*')
+                    .order('date', { ascending: true, nullsFirst: true });
+                
+                if (error) throw error;
+                
+                return (verses || []).map(v => ({
+                    text: v.text,
+                    reference: v.reference,
+                    date: v.date
+                }));
+            } catch (error) {
+                console.error('Error loading verses from Supabase:', error);
                 return [];
             }
         }
         
-        function getTodayQuote() {
-            const quotes = getQuotesFromStorage();
+        async function getTodayQuote() {
+            // Always fetch fresh quotes to ensure we have the latest data
+            // Cache is only used to avoid multiple simultaneous requests
+            if (cachedQuotes.length === 0) {
+                cachedQuotes = await getQuotesFromSupabase();
+            }
+            
+            const quotes = cachedQuotes;
             const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
             
             // Find quote scheduled for today
@@ -446,8 +485,13 @@
             return availableQuotes[quoteIndex] || availableQuotes[0];
         }
         
-        function getTodayVerse() {
-            const verses = getVersesFromStorage();
+        async function getTodayVerse() {
+            // Load verses if not cached
+            if (cachedVerses.length === 0) {
+                cachedVerses = await getVersesFromSupabase();
+            }
+            
+            const verses = cachedVerses;
             const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
             
             // Find verse scheduled for today
@@ -477,7 +521,10 @@
             return availableVerses[verseIndex] || availableVerses[0];
         }
         
-        function displayQuote() {
+        let lastQuoteFetch = 0;
+        const QUOTE_CACHE_DURATION = 5000; // 5 seconds cache
+        
+        async function displayQuote() {
             const quoteTextEl = document.getElementById('quote-text');
             const quoteAuthorEl = document.getElementById('quote-author');
             
@@ -487,14 +534,22 @@
             quoteTextEl.classList.remove('active');
             quoteAuthorEl.classList.remove('active');
             
-            setTimeout(function() {
-                const quote = getTodayQuote();
+            setTimeout(async function() {
+                // Always fetch fresh if cache is older than 5 seconds
+                const now = Date.now();
+                if (now - lastQuoteFetch > QUOTE_CACHE_DURATION || cachedQuotes.length === 0) {
+                    console.log('Fetching fresh quotes from Supabase');
+                    cachedQuotes = await getQuotesFromSupabase();
+                    lastQuoteFetch = now;
+                }
                 
-                if (quote.text) {
+                const quote = await getTodayQuote();
+                
+                if (quote && quote.text) {
                     quoteTextEl.innerHTML = '<p>' + quote.text + '</p>';
                     quoteAuthorEl.textContent = quote.author ? '— ' + quote.author : '';
                 } else {
-                    quoteTextEl.innerHTML = '<p>' + quote + '</p>';
+                    quoteTextEl.innerHTML = '<p>' + (quote || '') + '</p>';
                     quoteAuthorEl.textContent = '';
                 }
                 
@@ -506,7 +561,7 @@
             }, 500);
         }
         
-        function displayVerse() {
+        async function displayVerse() {
             const verseTextEl = document.getElementById('verse-text');
             const verseReferenceEl = document.getElementById('verse-reference');
             
@@ -516,14 +571,14 @@
             verseTextEl.classList.remove('active');
             verseReferenceEl.classList.remove('active');
             
-            setTimeout(function() {
-                const verse = getTodayVerse();
+            setTimeout(async function() {
+                const verse = await getTodayVerse();
                 
-                if (verse.text) {
+                if (verse && verse.text) {
                     verseTextEl.innerHTML = '<p>' + verse.text + '</p>';
                     verseReferenceEl.textContent = verse.reference ? '— ' + verse.reference : '';
                 } else {
-                    verseTextEl.innerHTML = '<p>' + verse + '</p>';
+                    verseTextEl.innerHTML = '<p>' + (verse || '') + '</p>';
                     verseReferenceEl.textContent = '';
                 }
                 
@@ -559,11 +614,54 @@
             }
         }
         
+        // Function to force refresh quotes
+        async function refreshQuotes() {
+            console.log('🔄 Refreshing quotes from Supabase');
+            cachedQuotes = []; // Clear cache
+            lastQuoteFetch = 0; // Reset cache timestamp
+            const quotes = await getQuotesFromSupabase();
+            cachedQuotes = quotes;
+            lastQuoteFetch = Date.now();
+            if (currentQuoteType === 'quote') {
+                await displayQuote();
+            }
+        }
+        
+        // Listen for admin updates
+        window.addEventListener('admin-content-updated', function(e) {
+            if (e.detail && e.detail.type === 'quotes') {
+                console.log('🔄 Admin updated quotes - refreshing display');
+                refreshQuotes();
+            }
+        });
+        
+        // Also listen for storage events (for cross-tab updates)
+        window.addEventListener('storage', function(e) {
+            if (e.key === 'quotes-updated') {
+                console.log('🔄 Storage event - refreshing quotes');
+                refreshQuotes();
+            }
+        });
+        
+        // Poll for updates every 10 seconds (fallback)
+        setInterval(function() {
+            if (document.visibilityState === 'visible') {
+                refreshQuotes();
+            }
+        }, 10000);
+        
         // Initialize quotes and verses on page load
+        // Always fetch fresh data on page load
+        async function initializeQuotes() {
+            cachedQuotes = []; // Clear any stale cache
+            lastQuoteFetch = 0; // Reset timestamp
+            await displayQuote();
+            await displayVerse();
+        }
+        
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', function() {
-                displayQuote();
-                displayVerse();
+                initializeQuotes();
                 // Change quote/verse every 10 seconds (optional - for rotation effect)
                 setInterval(function() {
                     if (currentQuoteType === 'quote') {
@@ -574,8 +672,7 @@
                 }, 10000);
             });
         } else {
-            displayQuote();
-            displayVerse();
+            initializeQuotes();
             // Change quote/verse every 10 seconds (optional - for rotation effect)
             setInterval(function() {
                 if (currentQuoteType === 'quote') {
