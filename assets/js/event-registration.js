@@ -60,7 +60,7 @@
         }
     }
     
-    function openEventRegistration(eventId) {
+    async function openEventRegistration(eventId) {
         const modal = document.getElementById('event-registration-modal');
         const form = document.getElementById('event-registration-form');
         const eventIdInput = document.getElementById('registration-event-id');
@@ -68,44 +68,77 @@
         
         if (!modal || !form || !eventIdInput) return;
         
-        // Get event data
-        const events = JSON.parse(localStorage.getItem('admin-events') || '[]');
-        currentEventData = events.find(e => (e.id || '').toString() === eventId.toString());
+        try {
+            // Get event data from Supabase
+            if (!window.supabase) {
+                alert('Database connection not available. Please refresh the page.');
+                return;
+            }
+
+            const { data: event, error } = await window.supabase
+                .from('events')
+                .select('*')
+                .eq('id', eventId)
+                .single();
+            
+            if (error || !event) {
+                alert('Event not found. Please refresh the page and try again.');
+                return;
+            }
+            
+            // Map Supabase field names to expected format
+            currentEventData = {
+                id: event.id,
+                title: event.title,
+                date: event.date,
+                time: event.time,
+                location: event.location,
+                description: event.description,
+                venue: event.venue,
+                contactName: event.contact_name,
+                contactEmail: event.contact_email,
+                contactPhone: event.contact_phone,
+                image: event.image,
+                registrationLink: event.registration_link,
+                featured: event.featured,
+                maxAttendees: event.max_attendees,
+                maxAttendeesPerOrganization: event.max_attendees_per_organization,
+                documents: event.documents || []
+            };
         
-        if (!currentEventData) {
-            alert('Event not found. Please refresh the page and try again.');
-            return;
+            // Check if event is full
+            const capacity = getEventCapacity();
+            if (capacity.total > 0 && capacity.remaining === 0) {
+                alert('Sorry, this event is full. No slots available.');
+                return;
+            }
+            
+            currentEventId = eventId;
+            eventIdInput.value = eventId;
+            attendeeDetails = [];
+            attendeeRowCounter = 0;
+            
+            // Reset form
+            form.reset();
+            document.getElementById('registration-type').value = '';
+            document.getElementById('attendees-list').innerHTML = '';
+            toggleRegistrationFields('individual');
+            updateCapacityInfo();
+            
+            // Update modal title
+            const title = document.getElementById('registration-modal-title');
+            if (title) {
+                title.textContent = `Register for: ${currentEventData.title}`;
+            }
+            
+            // Show modal
+            modal.setAttribute('aria-hidden', 'false');
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        } catch (error) {
+            console.error('Error loading event for registration:', error);
+            alert('Error loading event. Please try again.');
         }
-        
-        // Check if event is full
-        const capacity = getEventCapacity();
-        if (capacity.total > 0 && capacity.remaining === 0) {
-            alert('Sorry, this event is full. No slots available.');
-            return;
-        }
-        
-        currentEventId = eventId;
-        eventIdInput.value = eventId;
-        attendeeDetails = [];
-        attendeeRowCounter = 0;
-        
-        // Reset form
-        form.reset();
-        document.getElementById('registration-type').value = '';
-        document.getElementById('attendees-list').innerHTML = '';
-        toggleRegistrationFields('individual');
-        updateCapacityInfo();
-        
-        // Update modal title
-        const title = document.getElementById('registration-modal-title');
-        if (title) {
-            title.textContent = `Register for: ${currentEventData.title}`;
-        }
-        
-        // Show modal
-        modal.setAttribute('aria-hidden', 'false');
-        modal.classList.add('active');
-        document.body.style.overflow = 'hidden';
     }
     
     function closeEventRegistration() {

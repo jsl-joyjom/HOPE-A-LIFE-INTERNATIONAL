@@ -9,12 +9,9 @@
     if (!modal || !overlay || !closeBtn || !modalBody) return;
     
     // Open modal function - accessible globally
-    window.openEventDetails = function(eventId) {
-        const events = JSON.parse(localStorage.getItem('admin-events') || '[]');
-        const event = events.find(e => (e.id || '').toString() === eventId.toString());
-        
-        if (!event) {
-            // Try to get from card data attribute
+    window.openEventDetails = async function(eventId) {
+        try {
+            // Try to get from card data attribute first (faster)
             const card = document.querySelector(`[onclick*="openEventDetails('${eventId}')"]`);
             if (card && card.dataset.eventData) {
                 try {
@@ -25,11 +22,29 @@
                     console.error('Error parsing event data:', e);
                 }
             }
-            alert('Event not found');
-            return;
+            
+            // If not in card data, fetch from Supabase
+            if (!window.supabase) {
+                alert('Database connection not available. Please refresh the page.');
+                return;
+            }
+
+            const { data: event, error } = await window.supabase
+                .from('events')
+                .select('*')
+                .eq('id', eventId)
+                .single();
+            
+            if (error || !event) {
+                alert('Event not found');
+                return;
+            }
+            
+            displayEventDetails(event);
+        } catch (error) {
+            console.error('Error loading event details:', error);
+            alert('Error loading event details. Please try again.');
         }
-        
-        displayEventDetails(event);
     };
     
     function displayEventDetails(event) {
@@ -102,9 +117,9 @@
                         <div>
                             <strong>Contact</strong>
                             <div>
-                                ${event.contactName ? event.contactName + '<br>' : ''}
-                                ${event.contactEmail ? `<a href="mailto:${event.contactEmail}">${event.contactEmail}</a><br>` : ''}
-                                ${event.contactPhone ? `<a href="tel:${event.contactPhone}">${event.contactPhone}</a>` : ''}
+                                ${event.contact_name ? event.contact_name + '<br>' : ''}
+                                ${event.contact_email ? `<a href="mailto:${event.contact_email}">${event.contact_email}</a><br>` : ''}
+                                ${event.contact_phone ? `<a href="tel:${event.contact_phone}">${event.contact_phone}</a>` : ''}
                             </div>
                         </div>
                     </div>
@@ -120,12 +135,12 @@
             
             <div class="event-details-actions">
                 ${new Date(event.date) >= new Date() ? `
-                    <button class="event-register-btn" type="button" onclick="closeEventDetails(); openEventRegistration('${event.id || Date.now()}')">
+                    <button class="event-register-btn" type="button" onclick="closeEventDetails(); openEventRegistration('${event.id}')">
                         Register Here <i class="fas fa-user-plus" aria-hidden="true"></i>
                     </button>
                 ` : ''}
-                ${event.registrationLink ? `
-                    <a href="${event.registrationLink}" target="_blank" rel="noopener" class="event-register-btn">
+                ${event.registration_link ? `
+                    <a href="${event.registration_link}" target="_blank" rel="noopener" class="event-register-btn">
                         External Registration <i class="fas fa-external-link-alt"></i>
                     </a>
                 ` : ''}

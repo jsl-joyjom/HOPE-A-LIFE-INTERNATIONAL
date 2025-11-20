@@ -1,22 +1,37 @@
 // Events Loader - Loads events from admin panel to modal and updates notification badge
 (function() {
-    function getUpcomingEvents() {
-        const events = JSON.parse(localStorage.getItem('admin-events') || '[]');
-        const now = new Date();
-        
-        return events
-            .filter(event => {
-                const eventDate = new Date(event.date);
-                return event.featured || eventDate >= now;
-            })
-            .sort((a, b) => new Date(a.date) - new Date(b.date));
+    async function getUpcomingEvents() {
+        try {
+            if (!window.supabase) {
+                return [];
+            }
+
+            const { data: events, error } = await window.supabase
+                .from('events')
+                .select('*')
+                .order('date', { ascending: true });
+            
+            if (error) throw error;
+            
+            const now = new Date();
+            
+            return (events || [])
+                .filter(event => {
+                    const eventDate = new Date(event.date);
+                    return event.featured || eventDate >= now;
+                })
+                .sort((a, b) => new Date(a.date) - new Date(b.date));
+        } catch (error) {
+            console.error('Error loading events:', error);
+            return [];
+        }
     }
     
-    function updateNotificationBadge() {
+    async function updateNotificationBadge() {
         const badge = document.getElementById('notification-badge');
         if (!badge) return;
         
-        const upcomingEvents = getUpcomingEvents();
+        const upcomingEvents = await getUpcomingEvents();
         const count = upcomingEvents.length;
         
         badge.textContent = count;
@@ -33,11 +48,11 @@
         }
     }
     
-    function loadEvents() {
+    async function loadEvents() {
         const eventsContainer = document.getElementById('events-container-modal');
         if (!eventsContainer) return;
         
-        const upcomingEvents = getUpcomingEvents();
+        const upcomingEvents = await getUpcomingEvents();
         
         if (upcomingEvents.length === 0) {
             eventsContainer.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No upcoming events at this time. Check back soon!</p>';
@@ -68,22 +83,22 @@
                             </span>
                             <span class="event-location">
                                 <i class="fas fa-map-marker-alt" aria-hidden="true"></i>
-                                ${event.location}
+                                ${event.location || 'TBA'}
                             </span>
                         </div>
-                        <p class="event-description">${event.description}</p>
+                        <p class="event-description">${event.description || ''}</p>
                         ${event.venue ? `<p class="event-venue"><i class="fas fa-building" aria-hidden="true"></i> ${event.venue}</p>` : ''}
-                        ${event.registrationLink ? `
-                            <a href="${event.registrationLink}" class="event-register-btn" target="_blank" rel="noopener">
+                        ${event.registration_link ? `
+                            <a href="${event.registration_link}" class="event-register-btn" target="_blank" rel="noopener">
                                 Register Now <i class="fas fa-arrow-right" aria-hidden="true"></i>
                             </a>
                         ` : ''}
-                        ${event.contactName || event.contactEmail || event.contactPhone ? `
+                        ${event.contact_name || event.contact_email || event.contact_phone ? `
                             <div class="event-contact">
                                 <p><strong>Contact:</strong> 
-                                    ${event.contactName ? event.contactName : ''}
-                                    ${event.contactEmail ? ` <a href="mailto:${event.contactEmail}">${event.contactEmail}</a>` : ''}
-                                    ${event.contactPhone ? ` <a href="tel:${event.contactPhone}">${event.contactPhone}</a>` : ''}
+                                    ${event.contact_name ? event.contact_name : ''}
+                                    ${event.contact_email ? ` <a href="mailto:${event.contact_email}">${event.contact_email}</a>` : ''}
+                                    ${event.contact_phone ? ` <a href="tel:${event.contact_phone}">${event.contact_phone}</a>` : ''}
                                 </p>
                             </div>
                         ` : ''}
@@ -133,9 +148,9 @@
         });
     }
     
-    function init() {
-        loadEvents();
-        updateNotificationBadge();
+    async function init() {
+        await loadEvents();
+        await updateNotificationBadge();
         initModal();
     }
     
@@ -145,15 +160,10 @@
         init();
     }
     
-    window.addEventListener('storage', () => {
-        loadEvents();
-        updateNotificationBadge();
-    });
-    
-    window.addEventListener('admin-content-updated', (e) => {
+    window.addEventListener('admin-content-updated', async (e) => {
         if (e.detail.type === 'events') {
-            loadEvents();
-            updateNotificationBadge();
+            await loadEvents();
+            await updateNotificationBadge();
         }
     });
 })();

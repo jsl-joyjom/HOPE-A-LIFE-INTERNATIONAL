@@ -22,37 +22,54 @@
         }
     });
     
-    function loadAdminEvents() {
+    async function loadAdminEvents() {
         const upcomingContainer = document.querySelector('#upcoming-events');
         const pastContainer = document.querySelector('#past-events');
         
         if (!upcomingContainer || !pastContainer) return;
         
-        const events = JSON.parse(localStorage.getItem('admin-events') || '[]');
+        try {
+            if (!window.supabase) {
+                upcomingContainer.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Database connection not available. Please refresh the page.</p>';
+                pastContainer.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Database connection not available. Please refresh the page.</p>';
+                return;
+            }
+
+            const { data: events, error } = await window.supabase
+                .from('events')
+                .select('*')
+                .order('date', { ascending: true });
+            
+            if (error) throw error;
+            
+            // Sort by date
+            const sortedEvents = (events || []).sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            const now = new Date();
+            const upcoming = sortedEvents.filter(event => new Date(event.date) >= now);
+            const past = sortedEvents.filter(event => new Date(event.date) < now).reverse(); // Reverse to show newest first
         
-        // Sort by date
-        events.sort((a, b) => new Date(a.date) - new Date(b.date));
-        
-        const now = new Date();
-        const upcoming = events.filter(event => new Date(event.date) >= now);
-        const past = events.filter(event => new Date(event.date) < now).reverse(); // Reverse to show newest first
-        
-        // Load upcoming events
-        if (upcoming.length === 0) {
-            upcomingContainer.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No upcoming events scheduled. Check back soon!</p>';
-        } else {
-            upcomingContainer.innerHTML = upcoming.map(event => createEventCard(event)).join('');
-            // Handle image loading after HTML is inserted
-            setTimeout(() => handleEventImageLoading(), 50);
-        }
-        
-        // Load past events
-        if (past.length === 0) {
-            pastContainer.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No past events to display.</p>';
-        } else {
-            pastContainer.innerHTML = past.map(event => createEventCard(event)).join('');
-            // Handle image loading after HTML is inserted
-            setTimeout(() => handleEventImageLoading(), 50);
+            // Load upcoming events
+            if (upcoming.length === 0) {
+                upcomingContainer.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No upcoming events scheduled. Check back soon!</p>';
+            } else {
+                upcomingContainer.innerHTML = upcoming.map(event => createEventCard(event)).join('');
+                // Handle image loading after HTML is inserted
+                setTimeout(() => handleEventImageLoading(), 50);
+            }
+            
+            // Load past events
+            if (past.length === 0) {
+                pastContainer.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No past events to display.</p>';
+            } else {
+                pastContainer.innerHTML = past.map(event => createEventCard(event)).join('');
+                // Handle image loading after HTML is inserted
+                setTimeout(() => handleEventImageLoading(), 50);
+            }
+        } catch (error) {
+            console.error('Error loading events:', error);
+            upcomingContainer.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Error loading events. Please try again.</p>';
+            pastContainer.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Error loading events. Please try again.</p>';
         }
     }
     
@@ -77,7 +94,7 @@
         const loadingAttr = isBase64 ? '' : 'loading="lazy"';
         
         return `
-            <article class="event-card" onclick="openEventDetails('${event.id || Date.now()}')" data-event-data='${eventData}'>
+            <article class="event-card" onclick="openEventDetails('${event.id}')" data-event-data='${eventData}'>
                 ${event.image ? `
                     <div class="event-image">
                         <img src="${event.image}" alt="${event.title}" ${loadingAttr} data-event-image>
@@ -92,12 +109,12 @@
                         </span>
                         <span class="event-location">
                             <i class="fas fa-map-marker-alt" aria-hidden="true"></i>
-                            ${event.location}
+                            ${event.location || 'TBA'}
                         </span>
                     </div>
                     <p class="event-description">${shortDescription}</p>
                     ${event.venue ? `<p class="event-venue"><i class="fas fa-building" aria-hidden="true"></i> ${event.venue}</p>` : ''}
-                    <button class="event-register-btn" type="button" onclick="event.stopPropagation(); openEventDetails('${event.id || Date.now()}')">
+                    <button class="event-register-btn" type="button" onclick="event.stopPropagation(); openEventDetails('${event.id}')">
                         View Details <i class="fas fa-arrow-right" aria-hidden="true"></i>
                     </button>
                 </div>

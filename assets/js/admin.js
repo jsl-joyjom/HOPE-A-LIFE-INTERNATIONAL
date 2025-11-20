@@ -1566,39 +1566,56 @@ async function deleteEvent(eventId) {
 }
 
 // Event Registrations Management
-function viewEventRegistrants(eventId) {
-    const registrations = JSON.parse(localStorage.getItem('event-registrations') || '[]');
-    const eventRegistrations = registrations.filter(reg => reg.eventId.toString() === eventId.toString());
-    const events = JSON.parse(localStorage.getItem('admin-events') || '[]');
-    const event = events.find(e => (e.id || '').toString() === eventId.toString());
-    
-    const container = document.getElementById('event-registrations-container');
-    if (!container) return;
-    
-    // Store current event ID for refresh
-    container.setAttribute('data-current-event-id', eventId);
-    
-    if (!event) {
-        container.innerHTML = '<p style="color: var(--error-color);">Event not found.</p>';
-        return;
-    }
-    
-    if (eventRegistrations.length === 0) {
+async function viewEventRegistrants(eventId) {
+    try {
+        const registrations = JSON.parse(localStorage.getItem('event-registrations') || '[]');
+        const eventRegistrations = registrations.filter(reg => reg.eventId.toString() === eventId.toString());
+        
+        // Get event from Supabase
+        if (!window.supabase) {
+            const container = document.getElementById('event-registrations-container');
+            if (container) {
+                container.innerHTML = '<p style="color: var(--error-color);">Database connection not available.</p>';
+            }
+            return;
+        }
+
+        const { data: event, error } = await window.supabase
+            .from('events')
+            .select('*')
+            .eq('id', eventId)
+            .single();
+        
+        if (error || !event) {
+            const container = document.getElementById('event-registrations-container');
+            if (container) {
+                container.innerHTML = '<p style="color: var(--error-color);">Event not found.</p>';
+            }
+            return;
+        }
+        
+        const container = document.getElementById('event-registrations-container');
+        if (!container) return;
+        
+        // Store current event ID for refresh
+        container.setAttribute('data-current-event-id', eventId);
+        
+        if (eventRegistrations.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 2rem;">
+                    <p style="color: var(--text-secondary); margin-bottom: 1rem;">No registrations yet for this event.</p>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Event: <strong>${event.title}</strong></p>
+                </div>
+            `;
+            return;
+        }
+        
+        // Calculate total attendees
+        const totalAttendees = eventRegistrations.reduce((sum, reg) => sum + (reg.numberOfAttendees || 1), 0);
+        const maxAttendees = event.max_attendees || 0;
+        const remainingSlots = maxAttendees > 0 ? Math.max(0, maxAttendees - totalAttendees) : 'Unlimited';
+        
         container.innerHTML = `
-            <div style="text-align: center; padding: 2rem;">
-                <p style="color: var(--text-secondary); margin-bottom: 1rem;">No registrations yet for this event.</p>
-                <p style="color: var(--text-secondary); font-size: 0.9rem;">Event: <strong>${event.title}</strong></p>
-            </div>
-        `;
-        return;
-    }
-    
-    // Calculate total attendees
-    const totalAttendees = eventRegistrations.reduce((sum, reg) => sum + (reg.numberOfAttendees || 1), 0);
-    const maxAttendees = event.maxAttendees || 0;
-    const remainingSlots = maxAttendees > 0 ? Math.max(0, maxAttendees - totalAttendees) : 'Unlimited';
-    
-    container.innerHTML = `
         <div style="margin-bottom: 1.5rem;">
             <h3 style="margin-bottom: 0.5rem;">${event.title}</h3>
             <p style="color: var(--text-secondary); margin-bottom: 1rem;">
@@ -1664,21 +1681,38 @@ function viewEventRegistrants(eventId) {
             </table>
         </div>
     `;
+    } catch (error) {
+        console.error('Error loading event registrants:', error);
+        const container = document.getElementById('event-registrations-container');
+        if (container) {
+            container.innerHTML = '<p style="color: var(--error-color);">Error loading registrants. Please try again.</p>';
+        }
+    }
 }
 
-function exportRegistrantsPDF(eventId) {
-    const registrations = JSON.parse(localStorage.getItem('event-registrations') || '[]');
-    const eventRegistrations = registrations.filter(reg => reg.eventId.toString() === eventId.toString());
-    const events = JSON.parse(localStorage.getItem('admin-events') || '[]');
-    const event = events.find(e => (e.id || '').toString() === eventId.toString());
-    
-    if (!event || eventRegistrations.length === 0) {
-        alert('No registrations to export.');
-        return;
-    }
-    
-    // Create PDF content
-    let pdfContent = `
+async function exportRegistrantsPDF(eventId) {
+    try {
+        const registrations = JSON.parse(localStorage.getItem('event-registrations') || '[]');
+        const eventRegistrations = registrations.filter(reg => reg.eventId.toString() === eventId.toString());
+        
+        if (!window.supabase) {
+            alert('Database connection not available.');
+            return;
+        }
+
+        const { data: event, error } = await window.supabase
+            .from('events')
+            .select('*')
+            .eq('id', eventId)
+            .single();
+        
+        if (error || !event || eventRegistrations.length === 0) {
+            alert('No registrations to export.');
+            return;
+        }
+        
+        // Create PDF content
+        let pdfContent = `
         <html>
         <head>
             <title>Event Registrants - ${event.title}</title>
@@ -1710,76 +1744,94 @@ function exportRegistrantsPDF(eventId) {
                 <tbody>
     `;
     
-    eventRegistrations.forEach((reg, index) => {
+        eventRegistrations.forEach((reg, index) => {
+            pdfContent += `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td>${reg.registrationType === 'organization' ? `${reg.organizationName || 'N/A'} (Contact: ${reg.name || 'N/A'})` : reg.name || 'N/A'}</td>
+                    <td>${reg.registrationType || 'individual'}</td>
+                    <td>${reg.email}</td>
+                    <td>${reg.phone}</td>
+                    <td>${reg.numberOfAttendees || 1}</td>
+                    <td>${new Date(reg.registrationDate).toLocaleDateString()}</td>
+                </tr>
+            `;
+        });
+        
         pdfContent += `
-            <tr>
-                <td>${index + 1}</td>
-                <td>${reg.registrationType === 'organization' ? `${reg.organizationName || 'N/A'} (Contact: ${reg.name || 'N/A'})` : reg.name || 'N/A'}</td>
-                <td>${reg.registrationType || 'individual'}</td>
-                <td>${reg.email}</td>
-                <td>${reg.phone}</td>
-                <td>${reg.numberOfAttendees || 1}</td>
-                <td>${new Date(reg.registrationDate).toLocaleDateString()}</td>
-            </tr>
-        `;
-    });
-    
-    pdfContent += `
                 </tbody>
             </table>
         </body>
         </html>
     `;
     
-    // Open print dialog
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(pdfContent);
-    printWindow.document.close();
-    printWindow.print();
+        // Open print dialog
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(pdfContent);
+        printWindow.document.close();
+        printWindow.print();
+    } catch (error) {
+        console.error('Error exporting PDF:', error);
+        alert('Error exporting PDF. Please try again.');
+    }
 }
 
-function exportRegistrantsExcel(eventId) {
-    const registrations = JSON.parse(localStorage.getItem('event-registrations') || '[]');
-    const eventRegistrations = registrations.filter(reg => reg.eventId.toString() === eventId.toString());
-    const events = JSON.parse(localStorage.getItem('admin-events') || '[]');
-    const event = events.find(e => (e.id || '').toString() === eventId.toString());
-    
-    if (!event || eventRegistrations.length === 0) {
-        alert('No registrations to export.');
-        return;
-    }
-    
-    // Create CSV content
-    let csvContent = `Event: ${event.title}\n`;
-    csvContent += `Event Date: ${new Date(event.date).toLocaleDateString()}\n`;
-    csvContent += `Location: ${event.location}\n`;
-    csvContent += `Total Registrations: ${eventRegistrations.length}\n\n`;
-    
-    csvContent += `#,Name/Organization,Type,Email,Phone,Address,Attendees,Registered Date,Additional Notes\n`;
-    
-    eventRegistrations.forEach((reg, index) => {
-        const name = reg.registrationType === 'organization' 
-            ? `${reg.organizationName || 'N/A'} (Contact: ${reg.name || 'N/A'})` 
-            : reg.name || 'N/A';
-        const email = reg.email || '';
-        const phone = reg.phone || '';
-        const address = (reg.address || '').replace(/,/g, ';');
-        const notes = (reg.additionalNotes || '').replace(/,/g, ';');
-        const registered = new Date(reg.registrationDate).toLocaleDateString();
+async function exportRegistrantsExcel(eventId) {
+    try {
+        const registrations = JSON.parse(localStorage.getItem('event-registrations') || '[]');
+        const eventRegistrations = registrations.filter(reg => reg.eventId.toString() === eventId.toString());
         
-        csvContent += `${index + 1},"${name}",${reg.registrationType || 'individual'},"${email}","${phone}","${address}",${reg.numberOfAttendees || 1},"${registered}","${notes}"\n`;
-    });
-    
-    // Create download link
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `event-registrants-${event.title.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${Date.now()}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+        if (!window.supabase) {
+            alert('Database connection not available.');
+            return;
+        }
+
+        const { data: event, error } = await window.supabase
+            .from('events')
+            .select('*')
+            .eq('id', eventId)
+            .single();
+        
+        if (error || !event || eventRegistrations.length === 0) {
+            alert('No registrations to export.');
+            return;
+        }
+        
+        // Create CSV content
+        let csvContent = `Event: ${event.title}\n`;
+        csvContent += `Event Date: ${new Date(event.date).toLocaleDateString()}\n`;
+        csvContent += `Location: ${event.location || 'N/A'}\n`;
+        csvContent += `Total Registrations: ${eventRegistrations.length}\n\n`;
+        
+        csvContent += `#,Name/Organization,Type,Email,Phone,Address,Attendees,Registered Date,Additional Notes\n`;
+        
+        eventRegistrations.forEach((reg, index) => {
+            const name = reg.registrationType === 'organization' 
+                ? `${reg.organizationName || 'N/A'} (Contact: ${reg.name || 'N/A'})` 
+                : reg.name || 'N/A';
+            const email = reg.email || '';
+            const phone = reg.phone || '';
+            const address = (reg.address || '').replace(/,/g, ';');
+            const notes = (reg.additionalNotes || '').replace(/,/g, ';');
+            const registered = new Date(reg.registrationDate).toLocaleDateString();
+            
+            csvContent += `${index + 1},"${name}",${reg.registrationType || 'individual'},"${email}","${phone}","${address}",${reg.numberOfAttendees || 1},"${registered}","${notes}"\n`;
+        });
+        
+        // Create download link
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `event-registrants-${event.title.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${Date.now()}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    } catch (error) {
+        console.error('Error exporting Excel:', error);
+        alert('Error exporting Excel. Please try again.');
+    }
 }
 
 // Helper function to clean contact information from Excel formatting
@@ -1921,16 +1973,16 @@ function openBulkEmailModal(eventId) {
         return;
     }
     
-    if (eventRegistrations.length === 0) {
-        alert('No registrations found for this event.');
-        return;
-    }
-    
-    // Count total recipients (including all attendees)
-    const recipientEmails = new Set();
-    const recipientList = [];
-    
-    eventRegistrations.forEach(reg => {
+        if (eventRegistrations.length === 0) {
+            alert('No registrations found for this event.');
+            return;
+        }
+        
+        // Count total recipients (including all attendees)
+        const recipientEmails = new Set();
+        const recipientList = [];
+        
+        eventRegistrations.forEach(reg => {
         // Add main registrant email
         if (reg.email) {
             const cleanEmail = cleanContactInfo(reg.email);
