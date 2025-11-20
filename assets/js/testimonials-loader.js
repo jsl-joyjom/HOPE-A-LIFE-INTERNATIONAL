@@ -143,7 +143,7 @@
         console.log('MutationObserver set up to watch for new testimonials');
     }
     
-    function loadAdminTestimonials() {
+    async function loadAdminTestimonials() {
         const testimonialsGrid = document.querySelector('.testimonials-grid');
         if (!testimonialsGrid) {
             console.warn('Testimonials grid not found, retrying...');
@@ -154,52 +154,68 @@
             return;
         }
         
-        // Ensure grid is visible with !important
-        testimonialsGrid.style.setProperty('display', '', 'important');
-        testimonialsGrid.style.setProperty('visibility', 'visible', 'important');
-        testimonialsGrid.style.setProperty('opacity', '1', 'important');
-        
-        const adminTestimonials = JSON.parse(localStorage.getItem('admin-testimonials') || '[]');
-        console.log('Loading admin testimonials:', adminTestimonials.length, adminTestimonials);
-        
-        // Count static testimonials
-        const staticCards = testimonialsGrid.querySelectorAll('.testimonial-card:not([data-admin-testimonial="true"])');
-        console.log('Static testimonials found:', staticCards.length);
-        
-        // Get initials helper
-        function getInitials(name) {
-            if (!name) return 'U';
-            const parts = name.trim().split(/\s+/);
-            if (parts.length >= 2) {
-                return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+        try {
+            if (!window.supabase) {
+                console.warn('Supabase not available, skipping testimonials load');
+                return;
             }
-            return name.substring(0, 2).toUpperCase();
-        }
+
+            const { data: adminTestimonials, error } = await window.supabase
+                .from('testimonials')
+                .select('*')
+                .order('created_at', { ascending: false });
+            
+            if (error) {
+                console.error('Error loading testimonials:', error);
+                return;
+            }
+            
+            // Ensure grid is visible with !important
+            testimonialsGrid.style.setProperty('display', '', 'important');
+            testimonialsGrid.style.setProperty('visibility', 'visible', 'important');
+            testimonialsGrid.style.setProperty('opacity', '1', 'important');
+            
+            const testimonials = adminTestimonials || [];
+            console.log('Loading admin testimonials:', testimonials.length, testimonials);
         
-        // Remove only previously added admin testimonials (marked with data-admin-testimonial)
-        const existingAdminCards = testimonialsGrid.querySelectorAll('.testimonial-card[data-admin-testimonial="true"]');
-        existingAdminCards.forEach(card => card.remove());
-        
-        // Sort admin testimonials by date (newest first) - show ALL, carousel will manage visibility
-        const sortedAdminTestimonials = [...adminTestimonials]
-            .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
-        
-        console.log('Total admin testimonials:', adminTestimonials.length);
-        console.log('All admin testimonials will be available in carousel (showing 3 at a time)');
-        
-        // Keep all static testimonials visible - they'll be managed by carousel
-        // Static testimonials are already in the DOM, we just need to ensure they're ready
-        staticCards.forEach((card) => {
-            // Keep them visible but carousel will manage which ones show
-            card.style.setProperty('display', '', 'important');
-            card.style.setProperty('opacity', '1', 'important');
-            card.style.setProperty('visibility', 'visible', 'important');
-        });
-        
-        // Add ALL admin testimonials (newest first) - carousel will manage showing only 3 at a time
-        // Admin testimonials will be added AFTER static ones in the DOM, but we want them to appear first
-        // So we'll prepend them to the grid
-        sortedAdminTestimonials.forEach((testimonial, displayIndex) => {
+            // Count static testimonials
+            const staticCards = testimonialsGrid.querySelectorAll('.testimonial-card:not([data-admin-testimonial="true"])');
+            console.log('Static testimonials found:', staticCards.length);
+            
+            // Get initials helper
+            function getInitials(name) {
+                if (!name) return 'U';
+                const parts = name.trim().split(/\s+/);
+                if (parts.length >= 2) {
+                    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+                }
+                return name.substring(0, 2).toUpperCase();
+            }
+            
+            // Remove only previously added admin testimonials (marked with data-admin-testimonial)
+            const existingAdminCards = testimonialsGrid.querySelectorAll('.testimonial-card[data-admin-testimonial="true"]');
+            existingAdminCards.forEach(card => card.remove());
+            
+            // Sort admin testimonials by date (newest first) - show ALL, carousel will manage visibility
+            const sortedAdminTestimonials = [...testimonials]
+                .sort((a, b) => new Date(b.created_at || b.date || 0) - new Date(a.created_at || a.date || 0));
+            
+            console.log('Total admin testimonials:', testimonials.length);
+            console.log('All admin testimonials will be available in carousel (showing 3 at a time)');
+            
+            // Keep all static testimonials visible - they'll be managed by carousel
+            // Static testimonials are already in the DOM, we just need to ensure they're ready
+            staticCards.forEach((card) => {
+                // Keep them visible but carousel will manage which ones show
+                card.style.setProperty('display', '', 'important');
+                card.style.setProperty('opacity', '1', 'important');
+                card.style.setProperty('visibility', 'visible', 'important');
+            });
+            
+            // Add ALL admin testimonials (newest first) - carousel will manage showing only 3 at a time
+            // Admin testimonials will be added AFTER static ones in the DOM, but we want them to appear first
+            // So we'll prepend them to the grid
+            sortedAdminTestimonials.forEach((testimonial, displayIndex) => {
             // Create and show admin testimonial
             const article = document.createElement('article');
             article.className = 'testimonial-card';
@@ -415,6 +431,9 @@
                 }
             });
         }, 200);
+        } catch (error) {
+            console.error('Error loading testimonials:', error);
+        }
     }
     
     // Load when DOM is ready and after a short delay to ensure other scripts have run

@@ -22,24 +22,38 @@
         }
     });
     
-    function loadAdminVideos() {
+    async function loadAdminVideos() {
         const videoGrid = document.querySelector('.video-grid');
         if (!videoGrid) return;
         
-        const adminVideos = JSON.parse(localStorage.getItem('admin-videos') || '[]');
-        
-        // Always load admin videos if they exist
-        if (adminVideos.length > 0) {
-            // Clear existing videos
-            const existingCards = videoGrid.querySelectorAll('.video-card');
-            existingCards.forEach(card => card.remove());
-        } else {
-            // Keep existing videos if no admin videos
-            return;
-        }
-        
-        // Add admin videos
-        adminVideos.forEach((video) => {
+        try {
+            if (!window.supabase) {
+                console.warn('Supabase not available, skipping video load');
+                return;
+            }
+
+            const { data: adminVideos, error } = await window.supabase
+                .from('videos')
+                .select('*')
+                .order('date', { ascending: false });
+            
+            if (error) {
+                console.error('Error loading videos:', error);
+                return;
+            }
+            
+            // Always load admin videos if they exist
+            if (adminVideos && adminVideos.length > 0) {
+                // Clear existing videos
+                const existingCards = videoGrid.querySelectorAll('.video-card');
+                existingCards.forEach(card => card.remove());
+            } else {
+                // Keep existing videos if no admin videos
+                return;
+            }
+            
+            // Add admin videos
+            adminVideos.forEach((video) => {
             const card = document.createElement('article');
             card.className = 'video-card';
             
@@ -69,9 +83,12 @@
             iframe.setAttribute('allowfullscreen', '');
             iframe.loading = 'lazy';
             
-            card.appendChild(iframe);
-            videoGrid.appendChild(card);
-        });
+                card.appendChild(iframe);
+                videoGrid.appendChild(card);
+            });
+        } catch (error) {
+            console.error('Error loading videos:', error);
+        }
     }
     
     // Load when DOM is ready
