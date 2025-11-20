@@ -303,22 +303,34 @@
             const observer = createAnimationObserver();
             observer.observe(article);
             
-            // Load existing comments for this testimonial
-            const commentsKey = `testimonial-comments-${testimonialId}`;
-            const existingComments = JSON.parse(localStorage.getItem(commentsKey) || '[]');
-            if (existingComments.length > 0) {
-                const commentsList = article.querySelector('.comments-list');
-                existingComments.forEach(comment => {
-                    const commentDiv = document.createElement('div');
-                    commentDiv.className = 'comment-item';
-                    commentDiv.innerHTML = `
-                        <div class="comment-author">${comment.author || 'Anonymous'}</div>
-                        <div class="comment-text">${comment.text}</div>
-                        <div class="comment-time">${comment.time || new Date(comment.date).toLocaleString()}</div>
-                    `;
-                    commentsList.appendChild(commentDiv);
-                });
+            // Load existing comments for this testimonial from Supabase
+            if (window.supabase) {
+                try {
+                    const { data: comments } = await window.supabase
+                        .from('testimonial_comments')
+                        .select('*')
+                        .eq('testimonial_id', testimonialId)
+                        .order('created_at', { ascending: true });
+                    
+                    if (comments && comments.length > 0) {
+                        const commentsList = article.querySelector('.comments-list');
+                        if (commentsList) {
+                            comments.forEach(comment => {
+                                const commentDiv = document.createElement('div');
+                                commentDiv.className = 'comment-item';
+                                commentDiv.innerHTML = `
+                                    <div class="comment-author">${comment.author || 'Anonymous'}</div>
+                                    <div class="comment-text">${comment.text}</div>
+                                    <div class="comment-time">${new Date(comment.created_at).toLocaleString()}</div>
+                                `;
+                                commentsList.appendChild(commentDiv);
+                            });
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error loading comments:', error);
                 }
+            }
         });
         
         hasLoaded = true;
@@ -397,26 +409,44 @@
                         
                         if (!commentText) return;
                         
-                        // Save comment to localStorage
-                        const commentsKey = `testimonial-comments-${testimonialId}`;
-                        const existingComments = JSON.parse(localStorage.getItem(commentsKey) || '[]');
-                        const newComment = {
-                            id: Date.now(),
-                            author: authorName,
-                            text: commentText,
-                            time: new Date().toLocaleString(),
-                            date: new Date().toISOString()
-                        };
-                        existingComments.push(newComment);
-                        localStorage.setItem(commentsKey, JSON.stringify(existingComments));
-                        
-                        // Display comment
-                        const commentsList = this.closest('.testimonial-comments').querySelector('.comments-list');
-                        const commentDiv = document.createElement('div');
-                        commentDiv.className = 'comment-item';
-                        commentDiv.innerHTML = `
-                            <div class="comment-author">${authorName}</div>
-                            <div class="comment-text">${commentText}</div>
+                        // Save comment to Supabase
+                        if (window.supabase) {
+                            try {
+                                const { data: newComment, error } = await window.supabase
+                                    .from('testimonial_comments')
+                                    .insert([{
+                                        testimonial_id: parseInt(testimonialId),
+                                        text: commentText,
+                                        author: authorName
+                                    }])
+                                    .select()
+                                    .single();
+                                
+                                if (error) throw error;
+                                
+                                // Display comment
+                                const commentsList = this.closest('.testimonial-comments').querySelector('.comments-list');
+                                if (commentsList && newComment) {
+                                    const commentDiv = document.createElement('div');
+                                    commentDiv.className = 'comment-item';
+                                    commentDiv.innerHTML = `
+                                        <div class="comment-author">${authorName}</div>
+                                        <div class="comment-text">${commentText}</div>
+                                        <div class="comment-time">${new Date(newComment.created_at).toLocaleString()}</div>
+                                    `;
+                                    commentsList.appendChild(commentDiv);
+                                    
+                                    // Clear form
+                                    commentInput.value = '';
+                                    if (nameInput) nameInput.value = '';
+                                }
+                            } catch (error) {
+                                console.error('Error saving comment:', error);
+                                alert('Error saving comment. Please try again.');
+                            }
+                        } else {
+                            alert('Database connection not available. Please refresh the page.');
+                        }
                             <div class="comment-time">${newComment.time}</div>
                         `;
                         commentsList.appendChild(commentDiv);

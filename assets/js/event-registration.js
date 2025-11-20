@@ -305,7 +305,6 @@
     
     function validateAttendeeDetails() {
         const rows = document.querySelectorAll('.attendee-row');
-        const registrations = JSON.parse(localStorage.getItem('event-registrations') || '[]');
         
         // Clear previous error indicators
         rows.forEach(row => {
@@ -588,9 +587,8 @@
                     }
                 }
                 
-                // Check for duplicates
-                const existingRegistrations = JSON.parse(localStorage.getItem('event-registrations') || '[]');
-                const duplicateErrors = checkDuplicates(parsedAttendees, existingRegistrations, currentEventId);
+                // Check for duplicates (already handled in saveRegistration via Supabase query)
+                const duplicateErrors = [];
                 
                 if (duplicateErrors.length > 0) {
                     // Show detailed error message

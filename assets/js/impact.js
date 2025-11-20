@@ -654,57 +654,123 @@ const initTestimonialInteractions = () => {
         const testimonialId = button.getAttribute('data-testimonial-id');
         const likeCount = button.querySelector('.like-count');
         
-        // Load saved likes from localStorage
-        const savedLikes = localStorage.getItem(`testimonial-likes-${testimonialId}`);
-        const isLiked = localStorage.getItem(`testimonial-liked-${testimonialId}`) === 'true';
+        // Helper function to get user identifier (session-based)
+        const getUserIdentifier = () => {
+            let identifier = sessionStorage.getItem('user-identifier');
+            if (!identifier) {
+                identifier = 'user-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+                sessionStorage.setItem('user-identifier', identifier);
+            }
+            return identifier;
+        };
         
-        if (savedLikes) {
-            likeCount.textContent = savedLikes;
-        }
+        // Load likes from Supabase
+        const loadLikes = async () => {
+            if (!window.supabase) return;
+            
+            try {
+                // Get total like count
+                const { count: totalLikes } = await window.supabase
+                    .from('testimonial_likes')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('testimonial_id', testimonialId);
+                
+                if (totalLikes !== null) {
+                    likeCount.textContent = totalLikes;
+                }
+                
+                // Check if current user has liked
+                const userIdentifier = getUserIdentifier();
+                const { data: existingLike } = await window.supabase
+                    .from('testimonial_likes')
+                    .select('id')
+                    .eq('testimonial_id', testimonialId)
+                    .eq('user_identifier', userIdentifier)
+                    .single();
+                
+                if (existingLike) {
+                    button.classList.add('liked');
+                    const farIcon = button.querySelector('.far.fa-heart');
+                    const fasIcon = button.querySelector('.fas.fa-heart');
+                    if (farIcon) farIcon.style.display = 'none';
+                    if (fasIcon) fasIcon.style.display = 'inline-block';
+                }
+            } catch (error) {
+                console.error('Error loading likes:', error);
+            }
+        };
+        
+        loadLikes();
         
         const farIcon = button.querySelector('.far.fa-heart');
         const fasIcon = button.querySelector('.fas.fa-heart');
         
-        if (isLiked) {
-            button.classList.add('liked');
-            if (farIcon) farIcon.style.display = 'none';
-            if (fasIcon) fasIcon.style.display = 'inline-block';
-        }
-        
-        button.addEventListener('click', () => {
-            const currentLikes = parseInt(likeCount.textContent) || 0;
-            const wasLiked = button.classList.contains('liked');
-            
-            if (wasLiked) {
-                // Unlike
-                button.classList.remove('liked');
-                if (farIcon) farIcon.style.display = 'inline-block';
-                if (fasIcon) fasIcon.style.display = 'none';
-                likeCount.textContent = Math.max(0, currentLikes - 1);
-                localStorage.setItem(`testimonial-liked-${testimonialId}`, 'false');
-            } else {
-                // Like with animation
-                button.classList.add('liked');
-                if (farIcon) farIcon.style.display = 'none';
-                if (fasIcon) {
-                    fasIcon.style.display = 'inline-block';
-                    // Trigger pulse animation
-                    fasIcon.style.animation = 'none';
-                    setTimeout(() => {
-                        fasIcon.style.animation = 'heartPulse 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
-                    }, 10);
-                }
-                likeCount.textContent = currentLikes + 1;
-                localStorage.setItem(`testimonial-liked-${testimonialId}`, 'true');
-                
-                // Trigger count bounce animation
-                likeCount.style.animation = 'none';
-                setTimeout(() => {
-                    likeCount.style.animation = 'countBounce 0.5s ease';
-                }, 10);
+        button.addEventListener('click', async () => {
+            if (!window.supabase) {
+                alert('Database connection not available. Please refresh the page.');
+                return;
             }
             
-            localStorage.setItem(`testimonial-likes-${testimonialId}`, likeCount.textContent);
+            const currentLikes = parseInt(likeCount.textContent) || 0;
+            const wasLiked = button.classList.contains('liked');
+            const userIdentifier = getUserIdentifier();
+            
+            try {
+                if (wasLiked) {
+                    // Unlike - remove from database
+                    const { error } = await window.supabase
+                        .from('testimonial_likes')
+                        .delete()
+                        .eq('testimonial_id', testimonialId)
+                        .eq('user_identifier', userIdentifier);
+                    
+                    if (error) throw error;
+                    
+                    button.classList.remove('liked');
+                    if (farIcon) farIcon.style.display = 'inline-block';
+                    if (fasIcon) fasIcon.style.display = 'none';
+                    likeCount.textContent = Math.max(0, currentLikes - 1);
+                } else {
+                    // Like - add to database
+                    const { error } = await window.supabase
+                        .from('testimonial_likes')
+                        .insert([{
+                            testimonial_id: testimonialId,
+                            user_identifier: userIdentifier
+                        }]);
+                    
+                    if (error) {
+                        // If duplicate, just update UI
+                        if (error.code === '23505') {
+                            button.classList.add('liked');
+                            if (farIcon) farIcon.style.display = 'none';
+                            if (fasIcon) fasIcon.style.display = 'inline-block';
+                        } else {
+                            throw error;
+                        }
+                    } else {
+                        button.classList.add('liked');
+                        if (farIcon) farIcon.style.display = 'none';
+                        if (fasIcon) {
+                            fasIcon.style.display = 'inline-block';
+                            // Trigger pulse animation
+                            fasIcon.style.animation = 'none';
+                            setTimeout(() => {
+                                fasIcon.style.animation = 'heartPulse 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
+                            }, 10);
+                        }
+                        likeCount.textContent = currentLikes + 1;
+                        
+                        // Trigger count bounce animation
+                        likeCount.style.animation = 'none';
+                        setTimeout(() => {
+                            likeCount.style.animation = 'countBounce 0.5s ease';
+                        }, 10);
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating like:', error);
+            }
         });
     });
     
@@ -715,11 +781,22 @@ const initTestimonialInteractions = () => {
         const commentsSection = document.querySelector(`.testimonial-comments[data-testimonial-id="${testimonialId}"]`);
         const commentCount = button.querySelector('.comment-count');
         
-        // Load saved comments count
-        const savedComments = localStorage.getItem(`testimonial-comments-${testimonialId}`);
-        if (savedComments) {
-            const comments = JSON.parse(savedComments);
-            commentCount.textContent = comments.length;
+        // Load comments count from Supabase
+        if (window.supabase && commentCount) {
+            (async () => {
+                try {
+                    const { count } = await window.supabase
+                        .from('testimonial_comments')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('testimonial_id', testimonialId);
+                    
+                    if (count !== null) {
+                        commentCount.textContent = count;
+                    }
+                } catch (error) {
+                    console.error('Error loading comment count:', error);
+                }
+            })();
         }
         
         button.addEventListener('click', () => {
@@ -842,47 +919,85 @@ const initTestimonialInteractions = () => {
     });
 };
 
-// Load comments from localStorage
-const loadComments = (testimonialId) => {
-    const commentsList = document.querySelector(`.testimonial-comments[data-testimonial-id="${testimonialId}"] .comments-list`);
-    const savedComments = localStorage.getItem(`testimonial-comments-${testimonialId}`);
-    
-    if (savedComments) {
-        const comments = JSON.parse(savedComments);
+// Load comments from Supabase
+const loadComments = async (testimonialId) => {
+    try {
+        const commentsList = document.querySelector(`.testimonial-comments[data-testimonial-id="${testimonialId}"] .comments-list`);
+        if (!commentsList) return;
+        
+        if (!window.supabase) {
+            console.warn('Supabase not available for loading comments');
+            return;
+        }
+        
+        const { data: comments, error } = await window.supabase
+            .from('testimonial_comments')
+            .select('*')
+            .eq('testimonial_id', testimonialId)
+            .order('created_at', { ascending: true });
+        
+        if (error) throw error;
+        
         commentsList.innerHTML = '';
-        comments.forEach(comment => {
-            addCommentToDOM(commentsList, comment);
-        });
+        if (comments && comments.length > 0) {
+            comments.forEach(comment => {
+                const commentData = {
+                    id: comment.id,
+                    text: comment.text,
+                    author: comment.author || 'Anonymous',
+                    time: new Date(comment.created_at).toLocaleString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric', 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                    })
+                };
+                addCommentToDOM(commentsList, commentData);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading comments:', error);
     }
 };
 
-// Add a new comment
-const addComment = (testimonialId, commentText, commenterName = '') => {
-    const savedComments = localStorage.getItem(`testimonial-comments-${testimonialId}`);
-    const comments = savedComments ? JSON.parse(savedComments) : [];
-    
-    // Use provided name or default to "Anonymous"
-    const author = commenterName && commenterName.trim() ? commenterName.trim() : 'Anonymous';
-    
-    const newComment = {
-        id: Date.now(),
-        text: commentText,
-        author: author,
-        time: new Date().toLocaleString('en-US', { 
-            month: 'short', 
-            day: 'numeric', 
-            hour: '2-digit', 
-            minute: '2-digit' 
-        })
-    };
-    
-    comments.push(newComment);
-    localStorage.setItem(`testimonial-comments-${testimonialId}`, JSON.stringify(comments));
-    
-    const commentsList = document.querySelector(`.testimonial-comments[data-testimonial-id="${testimonialId}"] .comments-list`);
-    if (commentsList) {
-        addCommentToDOM(commentsList, newComment, true);
-    }
+// Add a new comment to Supabase
+const addComment = async (testimonialId, commentText, commenterName = '') => {
+    try {
+        if (!window.supabase) {
+            alert('Database connection not available. Please refresh the page and try again.');
+            return;
+        }
+        
+        // Use provided name or default to "Anonymous"
+        const author = commenterName && commenterName.trim() ? commenterName.trim() : 'Anonymous';
+        
+        const { data: newComment, error } = await window.supabase
+            .from('testimonial_comments')
+            .insert([{
+                testimonial_id: testimonialId,
+                text: commentText,
+                author: author
+            }])
+            .select()
+            .single();
+        
+        if (error) throw error;
+        
+        const commentsList = document.querySelector(`.testimonial-comments[data-testimonial-id="${testimonialId}"] .comments-list`);
+        if (commentsList && newComment) {
+            const commentData = {
+                id: newComment.id,
+                text: newComment.text,
+                author: newComment.author || 'Anonymous',
+                time: new Date(newComment.created_at).toLocaleString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric', 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                })
+            };
+            addCommentToDOM(commentsList, commentData, true);
+        }
     
     // Update comment count with animation
     const commentCount = document.querySelector(`.comment-toggle-btn[data-testimonial-id="${testimonialId}"] .comment-count`);

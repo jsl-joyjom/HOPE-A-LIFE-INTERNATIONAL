@@ -1014,62 +1014,94 @@ async function editVideo(videoId) {
 }
 
 // Comments Management
-function loadComments(searchTerm = '') {
-    const allComments = [];
-    
-    // Get comments from all testimonials
-    for (let i = 1; i <= 10; i++) {
-        const comments = JSON.parse(localStorage.getItem(`testimonial-comments-${i}`) || '[]');
-        comments.forEach(comment => {
-            allComments.push({
-                ...comment,
-                testimonialId: i
-            });
-        });
-    }
-    
-    // Filter comments if search term provided
-    let filteredComments = allComments;
-    if (searchTerm.trim()) {
-        const searchLower = searchTerm.toLowerCase();
-        filteredComments = allComments.filter(comment => 
-            (comment.author && comment.author.toLowerCase().includes(searchLower)) ||
-            (comment.email && comment.email.toLowerCase().includes(searchLower)) ||
-            (comment.text && comment.text.toLowerCase().includes(searchLower))
-        );
-    }
-    
-    const list = document.getElementById('comments-list');
-    
-    if (filteredComments.length === 0) {
-        list.innerHTML = searchTerm.trim()
-            ? `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No comments found matching "${searchTerm}"</p>`
-            : '<p>No comments yet.</p>';
-        return;
-    }
-    
-    list.innerHTML = filteredComments.map((comment, index) => `
-        <div class="item-card">
-            <div class="item-card-content">
-                <h3>${comment.author}</h3>
-                <p>${comment.text}</p>
-                <p><strong>Time:</strong> ${comment.time} | <strong>Testimonial ID:</strong> ${comment.testimonialId}</p>
+async function loadComments(searchTerm = '') {
+    try {
+        if (!window.supabase) {
+            const list = document.getElementById('comments-list');
+            if (list) {
+                list.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Database connection not available. Please refresh the page.</p>';
+            }
+            return;
+        }
+
+        let query = window.supabase
+            .from('testimonial_comments')
+            .select('*, testimonials(id, name)')
+            .order('created_at', { ascending: false });
+        
+        const { data: comments, error } = await query;
+        
+        if (error) throw error;
+        
+        let filteredComments = comments || [];
+        
+        // Filter comments if search term provided
+        if (searchTerm.trim()) {
+            const searchLower = searchTerm.toLowerCase();
+            filteredComments = filteredComments.filter(comment => 
+                (comment.author && comment.author.toLowerCase().includes(searchLower)) ||
+                (comment.email && comment.email.toLowerCase().includes(searchLower)) ||
+                (comment.text && comment.text.toLowerCase().includes(searchLower))
+            );
+        }
+        
+        const list = document.getElementById('comments-list');
+        if (!list) return;
+        
+        if (filteredComments.length === 0) {
+            list.innerHTML = searchTerm.trim()
+                ? `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No comments found matching "${searchTerm}"</p>`
+                : '<p>No comments yet.</p>';
+            return;
+        }
+        
+        list.innerHTML = filteredComments.map((comment) => {
+            const timeDisplay = comment.created_at ? new Date(comment.created_at).toLocaleString() : 'Unknown time';
+            const testimonialName = comment.testimonials?.name || `ID: ${comment.testimonial_id}`;
+            return `
+            <div class="item-card">
+                <div class="item-card-content">
+                    <h3>${comment.author || 'Anonymous'}</h3>
+                    <p>${comment.text}</p>
+                    <p><strong>Time:</strong> ${timeDisplay} | <strong>Testimonial:</strong> ${testimonialName}</p>
+                </div>
+                <div class="item-card-actions">
+                    <button class="btn btn-danger" onclick="deleteComment(${comment.id})">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </div>
             </div>
-            <div class="item-card-actions">
-                <button class="btn btn-danger" onclick="deleteComment(${comment.testimonialId}, ${comment.id})">
-                    <i class="fas fa-trash"></i> Delete
-                </button>
-            </div>
-        </div>
-    `).join('');
+        `;
+        }).join('');
+    } catch (error) {
+        console.error('Error loading comments:', error);
+        const list = document.getElementById('comments-list');
+        if (list) {
+            list.innerHTML = '<p style="text-align: center; color: var(--text-danger); padding: 2rem;">Error loading comments. Please try again.</p>';
+        }
+    }
 }
 
-function deleteComment(testimonialId, commentId) {
-    if (confirm('Are you sure you want to delete this comment?')) {
-        const comments = JSON.parse(localStorage.getItem(`testimonial-comments-${testimonialId}`) || '[]');
-        const filtered = comments.filter(c => c.id !== commentId);
-        localStorage.setItem(`testimonial-comments-${testimonialId}`, JSON.stringify(filtered));
-        loadComments();
+async function deleteComment(commentId) {
+    if (!confirm('Are you sure you want to delete this comment?')) return;
+    
+    try {
+        if (!window.supabase) {
+            alert('Database connection not available. Please refresh the page.');
+            return;
+        }
+
+        const { error } = await window.supabase
+            .from('testimonial_comments')
+            .delete()
+            .eq('id', commentId);
+        
+        if (error) throw error;
+        
+        await loadComments();
+    } catch (error) {
+        console.error('Error deleting comment:', error);
+        alert(`Error deleting comment: ${error.message || 'Please try again.'}`);
     }
 }
 
@@ -1960,21 +1992,36 @@ async function viewEventRegistrants(eventId) {
 
 async function exportRegistrantsPDF(eventId) {
     try {
-        const registrations = JSON.parse(localStorage.getItem('event-registrations') || '[]');
-        const eventRegistrations = registrations.filter(reg => reg.eventId.toString() === eventId.toString());
-        
         if (!window.supabase) {
             alert('Database connection not available.');
             return;
         }
 
-        const { data: event, error } = await window.supabase
+        // Fetch event
+        const { data: event, error: eventError } = await window.supabase
             .from('events')
             .select('*')
             .eq('id', eventId)
             .single();
         
-        if (error || !event || eventRegistrations.length === 0) {
+        if (eventError || !event) {
+            alert('Event not found.');
+            return;
+        }
+        
+        // Fetch registrations from Supabase
+        const { data: eventRegistrations, error: regError } = await window.supabase
+            .from('event_registrations')
+            .select('*')
+            .eq('event_id', eventId)
+            .order('created_at', { ascending: true });
+        
+        if (regError) {
+            alert('Error loading registrations.');
+            return;
+        }
+        
+        if (!eventRegistrations || eventRegistrations.length === 0) {
             alert('No registrations to export.');
             return;
         }
@@ -1996,7 +2043,7 @@ async function exportRegistrantsPDF(eventId) {
             <h1>${event.title}</h1>
             <p><strong>Event Date:</strong> ${new Date(event.date).toLocaleDateString()}</p>
             <p><strong>Location:</strong> ${event.location}</p>
-            <p><strong>Total Registrations:</strong> ${registrations.length}</p>
+            <p><strong>Total Registrations:</strong> ${eventRegistrations.length}</p>
             <table>
                 <thead>
                     <tr>
@@ -2012,7 +2059,7 @@ async function exportRegistrantsPDF(eventId) {
                 <tbody>
     `;
     
-        registrations.forEach((reg, index) => {
+        eventRegistrations.forEach((reg, index) => {
             const name = reg.registration_type === 'organization' 
                 ? `${reg.organization_name || 'N/A'} (Contact: ${reg.contact_person || 'N/A'})` 
                 : reg.registrant_name || 'N/A';
@@ -2051,21 +2098,36 @@ async function exportRegistrantsPDF(eventId) {
 
 async function exportRegistrantsExcel(eventId) {
     try {
-        const registrations = JSON.parse(localStorage.getItem('event-registrations') || '[]');
-        const eventRegistrations = registrations.filter(reg => reg.eventId.toString() === eventId.toString());
-        
         if (!window.supabase) {
             alert('Database connection not available.');
             return;
         }
 
-        const { data: event, error } = await window.supabase
+        // Fetch event
+        const { data: event, error: eventError } = await window.supabase
             .from('events')
             .select('*')
             .eq('id', eventId)
             .single();
         
-        if (error || !event || eventRegistrations.length === 0) {
+        if (eventError || !event) {
+            alert('Event not found.');
+            return;
+        }
+        
+        // Fetch registrations from Supabase
+        const { data: eventRegistrations, error: regError } = await window.supabase
+            .from('event_registrations')
+            .select('*')
+            .eq('event_id', eventId)
+            .order('created_at', { ascending: true });
+        
+        if (regError) {
+            alert('Error loading registrations.');
+            return;
+        }
+        
+        if (!eventRegistrations || eventRegistrations.length === 0) {
             alert('No registrations to export.');
             return;
         }
@@ -2495,7 +2557,7 @@ function sendBulkEmails(eventId, subject, message, recipientList, cardFile, moda
     }
 }
 
-function completeEmailSend(eventId, subject, message, recipientList, cardDataUrl, cardFileName, modal, statusDiv, sendBtn) {
+async function completeEmailSend(eventId, subject, message, recipientList, cardDataUrl, cardFileName, modal, statusDiv, sendBtn) {
     try {
         // Build email body with invitation card note if available
         let emailBody = message;
@@ -2526,23 +2588,26 @@ function completeEmailSend(eventId, subject, message, recipientList, cardDataUrl
         // Open email client
         window.location.href = mailtoLink;
         
+        // Log the email action to Supabase (for admin tracking)
+        if (window.supabase) {
+            try {
+                await window.supabase
+                    .from('email_logs')
+                    .insert([{
+                        recipient_email: primaryEmail,
+                        subject: subject,
+                        message: `Sent to ${recipientEmails.length} recipient(s). BCC: ${bccEmails.join(', ')}`,
+                        status: 'sent'
+                    }]);
+            } catch (error) {
+                console.error('Error logging email:', error);
+            }
+        }
+        
         // Show success after a delay
         setTimeout(() => {
             const successMessage = `✅ Email client opened successfully!\n\nRecipients: ${recipientEmails.length}\n\n${cardDataUrl ? '⚠️ IMPORTANT: Please remember to attach the invitation card file (' + cardFileName + ') manually before sending.' : ''}\n\nIf your email client doesn't support BCC, you may need to send individual emails or use a bulk email service.`;
             showEmailStatus(modal, 'success', successMessage);
-            
-            // Log the email action (for admin tracking)
-            const emailLog = JSON.parse(localStorage.getItem('admin-email-logs') || '[]');
-            emailLog.push({
-                eventId: eventId,
-                subject: subject,
-                recipients: recipientEmails.length,
-                recipientList: recipientEmails,
-                hasInvitationCard: !!cardDataUrl,
-                invitationCardName: cardFileName,
-                sentAt: new Date().toISOString()
-            });
-            localStorage.setItem('admin-email-logs', JSON.stringify(emailLog));
             
             // Re-enable button with success state
             sendBtn.disabled = false;
@@ -2678,7 +2743,8 @@ async function saveQuote() {
         const quoteData = {
             text: textInput.value.trim(),
             author: authorInput && authorInput.value.trim() ? authorInput.value.trim() : null,
-            date: dateInput && dateInput.value ? dateInput.value : null
+            date: dateInput && dateInput.value ? dateInput.value : null,
+            status: 'published' // Always publish when saving
         };
         
         const { error } = await window.supabase
@@ -2777,7 +2843,8 @@ async function updateQuote(quoteId) {
         const quoteData = {
             text: textInput.value.trim(),
             author: authorInput && authorInput.value.trim() ? authorInput.value.trim() : null,
-            date: dateInput && dateInput.value ? dateInput.value : null
+            date: dateInput && dateInput.value ? dateInput.value : null,
+            status: 'published' // Always publish when updating
         };
         
         const { error } = await window.supabase
@@ -2874,22 +2941,36 @@ function clearQuoteForm() {
 }
 
 // Verses Management Functions
-function loadVerses() {
-    const versesList = document.getElementById('verses-list');
-    if (!versesList) return;
-    
-    const verses = getVersesFromStorage();
-    
-    if (verses.length === 0) {
-        versesList.innerHTML = '<p class="empty-state">No verses added yet. Add your first verse above.</p>';
-        return;
-    }
-    
-    versesList.innerHTML = verses.map((verse, index) => {
-        const dateDisplay = verse.date ? new Date(verse.date).toLocaleDateString() : 'General (No date)';
-        const isScheduled = verse.date && new Date(verse.date) > new Date();
-        return `
-            <div class="quote-item" data-index="${index}">
+async function loadVerses() {
+    try {
+        const versesList = document.getElementById('verses-list');
+        if (!versesList) return;
+        
+        if (!window.supabase) {
+            versesList.innerHTML = '<p class="empty-state">Database connection not available. Please refresh the page.</p>';
+            return;
+        }
+
+        // Admin panel shows all verses (including drafts)
+        const { data: verses, error } = await window.supabase
+            .from('daily_verses')
+            .select('*')
+            .order('date', { ascending: true, nullsFirst: true });
+        
+        if (error) throw error;
+        
+        const allVerses = verses || [];
+        
+        if (allVerses.length === 0) {
+            versesList.innerHTML = '<p class="empty-state">No verses added yet. Add your first verse above.</p>';
+            return;
+        }
+        
+        versesList.innerHTML = allVerses.map((verse) => {
+            const dateDisplay = verse.date ? new Date(verse.date).toLocaleDateString() : 'General (No date)';
+            const isScheduled = verse.date && new Date(verse.date) > new Date();
+            return `
+            <div class="quote-item" data-id="${verse.id}">
                 <div class="quote-item-content">
                     <div class="quote-item-text">
                         <p>"${verse.text}"</p>
@@ -2902,92 +2983,225 @@ function loadVerses() {
                     </div>
                 </div>
                 <div class="quote-item-actions">
-                    <button class="btn-icon" onclick="editVerse(${index})" title="Edit verse">
+                    <button class="btn-icon" onclick="editVerse(${verse.id})" title="Edit verse">
                         <i class="fas fa-edit"></i>
                     </button>
-                    <button class="btn-icon btn-danger" onclick="deleteVerse(${index})" title="Delete verse">
+                    <button class="btn-icon btn-danger" onclick="deleteVerse(${verse.id})" title="Delete verse">
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>
             </div>
         `;
-    }).join('');
+        }).join('');
+    } catch (error) {
+        console.error('Error loading verses:', error);
+        const versesList = document.getElementById('verses-list');
+        if (versesList) {
+            versesList.innerHTML = '<p class="empty-state">Error loading verses. Please try again.</p>';
+        }
+    }
 }
 
-function getVersesFromStorage() {
+async function saveVerse() {
     try {
-        const verses = localStorage.getItem('dailyVerses');
-        return verses ? JSON.parse(verses) : [];
-    } catch (e) {
-        return [];
+        const textInput = document.getElementById('verse-text-input');
+        const referenceInput = document.getElementById('verse-reference-input');
+        const dateInput = document.getElementById('verse-date-input');
+        
+        if (!textInput || !textInput.value.trim()) {
+            alert('Please enter a verse text.');
+            return;
+        }
+        
+        // Check if we're editing (has data-editing-id attribute)
+        const editingId = textInput.getAttribute('data-editing-id');
+        if (editingId) {
+            return await updateVerse(parseInt(editingId));
+        }
+        
+        if (!window.supabase) {
+            alert('Database connection not available. Please refresh the page.');
+            return;
+        }
+
+        const verseData = {
+            text: textInput.value.trim(),
+            reference: referenceInput && referenceInput.value.trim() ? referenceInput.value.trim() : null,
+            date: dateInput && dateInput.value ? dateInput.value : null,
+            status: 'published' // Always publish when saving
+        };
+        
+        const { error } = await window.supabase
+            .from('daily_verses')
+            .insert([verseData]);
+        
+        if (error) throw error;
+        
+        // Clear form
+        clearVerseForm();
+        
+        // Reload verses list
+        await loadVerses();
+        
+        // Show success message
+        alert('Verse saved successfully!');
+        
+        // Dispatch event for frontend update
+        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'verses' } }));
+        
+        // Also trigger storage event for cross-tab updates
+        try {
+            localStorage.setItem('verses-updated', Date.now().toString());
+            localStorage.removeItem('verses-updated');
+        } catch (e) {
+            // Ignore storage errors
+        }
+    } catch (error) {
+        console.error('Error saving verse:', error);
+        alert(`Error saving verse: ${error.message || 'Please try again.'}`);
     }
 }
 
-function saveVersesToStorage(verses) {
-    localStorage.setItem('dailyVerses', JSON.stringify(verses));
-}
+async function editVerse(verseId) {
+    try {
+        if (!window.supabase) {
+            alert('Database connection not available. Please refresh the page.');
+            return;
+        }
 
-function saveVerse() {
-    const textInput = document.getElementById('verse-text-input');
-    const referenceInput = document.getElementById('verse-reference-input');
-    const dateInput = document.getElementById('verse-date-input');
-    
-    if (!textInput || !textInput.value.trim()) {
-        alert('Please enter a verse text.');
-        return;
+        const { data: verse, error: fetchError } = await window.supabase
+            .from('daily_verses')
+            .select('*')
+            .eq('id', verseId)
+            .single();
+        
+        if (fetchError || !verse) {
+            alert('Verse not found.');
+            return;
+        }
+        
+        const textInput = document.getElementById('verse-text-input');
+        const referenceInput = document.getElementById('verse-reference-input');
+        const dateInput = document.getElementById('verse-date-input');
+        
+        if (textInput) textInput.value = verse.text || '';
+        if (referenceInput) referenceInput.value = verse.reference || '';
+        if (dateInput) dateInput.value = verse.date || '';
+        
+        // Store the ID being edited
+        if (textInput) textInput.setAttribute('data-editing-id', verseId);
+        
+        // Scroll to form
+        if (textInput) textInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (textInput) textInput.focus();
+        
+        // Change save button to update
+        const saveBtn = document.querySelector('#quotes-tab button.btn-primary[onclick*="saveVerse"]');
+        if (saveBtn) {
+            saveBtn.setAttribute('data-original-text', saveBtn.textContent);
+            saveBtn.innerHTML = '<i class="fas fa-save"></i> Update Verse';
+            saveBtn.onclick = () => updateVerse(verseId);
+        }
+    } catch (error) {
+        console.error('Error loading verse for editing:', error);
+        alert(`Error: ${error.message || 'Please try again.'}`);
     }
-    
-    const verses = getVersesFromStorage();
-    const newVerse = {
-        text: textInput.value.trim(),
-        reference: referenceInput ? referenceInput.value.trim() : '',
-        date: dateInput && dateInput.value ? dateInput.value : '',
-        createdAt: new Date().toISOString()
-    };
-    
-    verses.push(newVerse);
-    saveVersesToStorage(verses);
-    
-    // Clear form
-    clearVerseForm();
-    
-    // Reload verses list
-    loadVerses();
-    
-    // Show success message
-    alert('Verse saved successfully!');
 }
 
-function editVerse(index) {
-    const verses = getVersesFromStorage();
-    const verse = verses[index];
-    
-    if (!verse) return;
-    
-    const textInput = document.getElementById('verse-text-input');
-    const referenceInput = document.getElementById('verse-reference-input');
-    const dateInput = document.getElementById('verse-date-input');
-    
-    if (textInput) textInput.value = verse.text;
-    if (referenceInput) referenceInput.value = verse.reference || '';
-    if (dateInput) dateInput.value = verse.date || '';
-    
-    // Remove old verse and save new one
-    verses.splice(index, 1);
-    saveVersesToStorage(verses);
-    
-    // Scroll to form
-    if (textInput) textInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    if (textInput) textInput.focus();
+async function updateVerse(verseId) {
+    try {
+        const textInput = document.getElementById('verse-text-input');
+        const referenceInput = document.getElementById('verse-reference-input');
+        const dateInput = document.getElementById('verse-date-input');
+        
+        if (!textInput || !textInput.value.trim()) {
+            alert('Please enter a verse text.');
+            return;
+        }
+        
+        if (!window.supabase) {
+            alert('Database connection not available. Please refresh the page.');
+            return;
+        }
+
+        const verseData = {
+            text: textInput.value.trim(),
+            reference: referenceInput && referenceInput.value.trim() ? referenceInput.value.trim() : null,
+            date: dateInput && dateInput.value ? dateInput.value : null,
+            status: 'published' // Always publish when updating
+        };
+        
+        const { error } = await window.supabase
+            .from('daily_verses')
+            .update(verseData)
+            .eq('id', verseId);
+        
+        if (error) throw error;
+        
+        // Clear form
+        clearVerseForm();
+        
+        // Reset save button
+        const saveBtn = document.querySelector('#quotes-tab button.btn-primary[onclick*="saveVerse"]');
+        if (saveBtn && saveBtn.getAttribute('data-original-text')) {
+            saveBtn.innerHTML = saveBtn.getAttribute('data-original-text');
+            saveBtn.onclick = saveVerse;
+        }
+        
+        // Reload verses list
+        await loadVerses();
+        
+        // Show success message
+        alert('Verse updated successfully!');
+        
+        // Dispatch event for frontend update
+        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'verses' } }));
+        
+        // Also trigger storage event
+        try {
+            localStorage.setItem('verses-updated', Date.now().toString());
+            localStorage.removeItem('verses-updated');
+        } catch (e) {
+            // Ignore storage errors
+        }
+    } catch (error) {
+        console.error('Error updating verse:', error);
+        alert(`Error updating verse: ${error.message || 'Please try again.'}`);
+    }
 }
 
-function deleteVerse(index) {
+async function deleteVerse(verseId) {
     if (!confirm('Are you sure you want to delete this verse?')) return;
     
-    const verses = getVersesFromStorage();
-    verses.splice(index, 1);
-    saveVersesToStorage(verses);
-    loadVerses();
+    try {
+        if (!window.supabase) {
+            alert('Database connection not available. Please refresh the page.');
+            return;
+        }
+
+        const { error } = await window.supabase
+            .from('daily_verses')
+            .delete()
+            .eq('id', verseId);
+        
+        if (error) throw error;
+        
+        await loadVerses();
+        
+        // Dispatch event for frontend update
+        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'verses' } }));
+        
+        // Also trigger storage event
+        try {
+            localStorage.setItem('verses-updated', Date.now().toString());
+            localStorage.removeItem('verses-updated');
+        } catch (e) {
+            // Ignore storage errors
+        }
+    } catch (error) {
+        console.error('Error deleting verse:', error);
+        alert(`Error deleting verse: ${error.message || 'Please try again.'}`);
+    }
 }
 
 function clearVerseForm() {
@@ -2995,9 +3209,19 @@ function clearVerseForm() {
     const referenceInput = document.getElementById('verse-reference-input');
     const dateInput = document.getElementById('verse-date-input');
     
-    if (textInput) textInput.value = '';
+    if (textInput) {
+        textInput.value = '';
+        textInput.removeAttribute('data-editing-id');
+    }
     if (referenceInput) referenceInput.value = '';
     if (dateInput) dateInput.value = '';
+    
+    // Reset save button
+    const saveBtn = document.querySelector('#quotes-tab button.btn-primary[onclick*="saveVerse"]');
+    if (saveBtn && saveBtn.getAttribute('data-original-text')) {
+        saveBtn.innerHTML = saveBtn.getAttribute('data-original-text');
+        saveBtn.onclick = saveVerse;
+    }
 }
 
 // Listen for new registrations
@@ -3023,7 +3247,7 @@ async function loadNews(searchTerm = '', pendingSearchTerm = '') {
             return;
         }
 
-        // Fetch published news from Supabase
+        // Fetch all news from Supabase (admin panel shows all, including drafts)
         const { data: news, error: newsError } = await window.supabase
             .from('news')
             .select('*')
@@ -3153,6 +3377,7 @@ document.getElementById('news-form').addEventListener('submit', async (e) => {
             link: document.getElementById('news-link').value || null,
             source: document.getElementById('news-source').value || null,
             author: document.getElementById('news-author') ? document.getElementById('news-author').value || null : null,
+            status: 'published', // Always publish when saving
             date: new Date().toISOString()
         };
         
@@ -3209,6 +3434,7 @@ async function approveNews(newsId) {
             link: pendingNews.link || null,
             source: pendingNews.source || null,
             author: pendingNews.author || null,
+            status: 'published', // Always publish when approving
             date: new Date().toISOString()
         };
         
@@ -3306,50 +3532,77 @@ async function deleteNews(newsId) {
 }
 
 // Publications Management
-function loadPublications(searchTerm = '') {
-    const publications = JSON.parse(localStorage.getItem('admin-publications') || '[]');
-    const list = document.getElementById('publications-list');
-    
-    // Filter publications if search term provided
-    let filteredPublications = publications;
-    if (searchTerm.trim()) {
-        const searchLower = searchTerm.toLowerCase();
-        filteredPublications = publications.filter(pub => 
-            (pub.title && pub.title.toLowerCase().includes(searchLower)) ||
-            (pub.content && pub.content.toLowerCase().includes(searchLower)) ||
-            (pub.author && pub.author.toLowerCase().includes(searchLower)) ||
-            (pub.description && pub.description.toLowerCase().includes(searchLower))
-        );
-    }
-    
-    if (filteredPublications.length === 0) {
-        list.innerHTML = searchTerm.trim()
-            ? `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No publications found matching "${searchTerm}"</p>`
-            : '<p>No publications created yet. Create one above!</p>';
-        return;
-    }
-    
-    list.innerHTML = filteredPublications.map((pub, displayIndex) => {
-        // Find original index for edit/delete functions
-        const originalIndex = publications.findIndex(p => p.id === pub.id);
-        return `
-        <div class="item-card">
-            <div class="item-card-content">
-                <h3>${pub.title}</h3>
-                ${pub.author ? `<p><strong>Author:</strong> ${pub.author}</p>` : ''}
-                <p><strong>Date:</strong> ${new Date(pub.date).toLocaleDateString()}</p>
-                <p>${pub.content.substring(0, 200)}...</p>
-                ${pub.images && pub.images.length > 0 ? `<p><strong>Images:</strong> ${pub.images.length} image(s)</p>` : ''}
-                ${pub.videos && pub.videos.length > 0 ? `<p><strong>Videos:</strong> ${pub.videos.length} video(s)</p>` : ''}
+async function loadPublications(searchTerm = '') {
+    try {
+        if (!window.supabase) {
+            const list = document.getElementById('publications-list');
+            if (list) {
+                list.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Database connection not available. Please refresh the page.</p>';
+            }
+            return;
+        }
+
+        let query = window.supabase
+            .from('publications')
+            .select('*')
+            .order('date', { ascending: false });
+        
+        const { data: publications, error } = await query;
+        
+        if (error) throw error;
+        
+        let filteredPublications = publications || [];
+        
+        // Filter publications if search term provided
+        if (searchTerm.trim()) {
+            const searchLower = searchTerm.toLowerCase();
+            filteredPublications = filteredPublications.filter(pub => 
+                (pub.title && pub.title.toLowerCase().includes(searchLower)) ||
+                (pub.content && pub.content.toLowerCase().includes(searchLower)) ||
+                (pub.author && pub.author.toLowerCase().includes(searchLower))
+            );
+        }
+        
+        const list = document.getElementById('publications-list');
+        if (!list) return;
+        
+        if (filteredPublications.length === 0) {
+            list.innerHTML = searchTerm.trim()
+                ? `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No publications found matching "${searchTerm}"</p>`
+                : '<p>No publications created yet. Create one above!</p>';
+            return;
+        }
+        
+        list.innerHTML = filteredPublications.map((pub) => {
+            const pubDate = pub.date ? new Date(pub.date).toLocaleDateString() : 'No date';
+            const imagesCount = pub.images ? (Array.isArray(pub.images) ? pub.images.length : 0) : 0;
+            const videosCount = pub.videos ? (Array.isArray(pub.videos) ? pub.videos.length : 0) : 0;
+            const contentPreview = pub.content ? (pub.content.length > 200 ? pub.content.substring(0, 200) + '...' : pub.content) : '';
+            return `
+            <div class="item-card">
+                <div class="item-card-content">
+                    <h3>${pub.title || 'Untitled'}</h3>
+                    ${pub.author ? `<p><strong>Author:</strong> ${pub.author}</p>` : ''}
+                    <p><strong>Date:</strong> ${pubDate}</p>
+                    <p>${contentPreview}</p>
+                    ${imagesCount > 0 ? `<p><strong>Images:</strong> ${imagesCount} image(s)</p>` : ''}
+                    ${videosCount > 0 ? `<p><strong>Videos:</strong> ${videosCount} video(s)</p>` : ''}
+                </div>
+                <div class="item-card-actions">
+                    <button class="btn btn-danger" onclick="deletePublication(${pub.id})">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </div>
             </div>
-            <div class="item-card-actions">
-                <button class="btn btn-danger" onclick="deletePublication(${originalIndex})">
-                    <i class="fas fa-trash"></i> Delete
-                </button>
-            </div>
-        </div>
-    `;
-    }).join('');
+        `;
+        }).join('');
+    } catch (error) {
+        console.error('Error loading publications:', error);
+        const list = document.getElementById('publications-list');
+        if (list) {
+            list.innerHTML = '<p style="text-align: center; color: var(--text-danger); padding: 2rem;">Error loading publications. Please try again.</p>';
+        }
+    }
 }
 
 document.getElementById('publication-form').addEventListener('submit', async (e) => {
@@ -3416,37 +3669,82 @@ document.getElementById('publication-form').addEventListener('submit', async (e)
         publication.videos.push(...videoUrls.map(url => url.trim()));
     }
     
-    // Wait a bit for file readers
-    setTimeout(() => {
-        const publications = JSON.parse(localStorage.getItem('admin-publications') || '[]');
-        publications.push(publication);
-        localStorage.setItem('admin-publications', JSON.stringify(publications));
-        
-        showAlert('publication-alert', '✅ Publication created successfully!', 'success');
-        document.getElementById('publication-form').reset();
-        loadPublications();
-        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'publications' } }));
+    // Wait a bit for file readers, then save to Supabase
+    setTimeout(async () => {
+        try {
+            if (!window.supabase) {
+                showAlert('publication-alert', '❌ Database connection not available. Please refresh the page.', 'error');
+                return;
+            }
+
+            const publicationData = {
+                title: publication.title,
+                content: publication.content,
+                author: publication.author || null,
+                date: publication.date,
+                images: publication.images.length > 0 ? publication.images : null,
+                videos: publication.videos.length > 0 ? publication.videos : null
+            };
+            
+            const { error } = await window.supabase
+                .from('publications')
+                .insert([publicationData]);
+            
+            if (error) throw error;
+            
+            showAlert('publication-alert', '✅ Publication created successfully!', 'success');
+            document.getElementById('publication-form').reset();
+            await loadPublications();
+            window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'publications' } }));
+        } catch (error) {
+            console.error('Error saving publication:', error);
+            showAlert('publication-alert', `❌ Error saving publication: ${error.message || 'Please try again.'}`, 'error');
+        }
     }, 1000);
 });
 
-function deletePublication(index) {
-    if (confirm('Are you sure you want to delete this publication?')) {
-        const publications = JSON.parse(localStorage.getItem('admin-publications') || '[]');
-        publications.splice(index, 1);
-        localStorage.setItem('admin-publications', JSON.stringify(publications));
-        loadPublications();
+async function deletePublication(publicationId) {
+    if (!confirm('Are you sure you want to delete this publication?')) return;
+    
+    try {
+        if (!window.supabase) {
+            alert('Database connection not available. Please refresh the page.');
+            return;
+        }
+
+        const { error } = await window.supabase
+            .from('publications')
+            .delete()
+            .eq('id', publicationId);
+        
+        if (error) throw error;
+        
+        await loadPublications();
         window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'publications' } }));
+    } catch (error) {
+        console.error('Error deleting publication:', error);
+        alert(`Error deleting publication: ${error.message || 'Please try again.'}`);
     }
 }
 
 // Update pending count on load and when new stories arrive
-function updatePendingCount() {
-    const pendingStories = JSON.parse(localStorage.getItem('pending-stories') || '[]');
-    const pendingCount = pendingStories.filter(s => s.status === 'pending').length;
-    const badge = document.getElementById('pending-count');
-    if (badge) {
-        badge.textContent = pendingCount;
-        badge.style.display = pendingCount > 0 ? 'inline-block' : 'none';
+async function updatePendingCount() {
+    try {
+        if (!window.supabase) return;
+        
+        const { count } = await window.supabase
+            .from('pending_stories')
+            .select('*', { count: 'exact', head: true })
+            .eq('status', 'pending');
+        
+        const badge = document.getElementById('pending-count');
+        if (badge) {
+            const pendingCount = count || 0;
+            badge.textContent = pendingCount;
+            badge.style.display = pendingCount > 0 ? 'inline-block' : 'none';
+        }
+    } catch (error) {
+        console.error('Error updating pending count:', error);
     }
 }
 

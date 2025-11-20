@@ -11,9 +11,11 @@
                 return [];
             }
             
+            // Only fetch published news
             const { data: news, error } = await window.supabase
                 .from('news')
                 .select('*')
+                .eq('status', 'published')
                 .order('date', { ascending: false });
             
             if (error) throw error;

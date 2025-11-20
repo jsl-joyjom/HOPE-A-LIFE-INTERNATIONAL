@@ -69,21 +69,9 @@
             }
         }
         
-        // Fallback to localStorage if Supabase failed or not available
+        // No localStorage fallback - only use Supabase
         if (adminPhotos.length === 0) {
-            try {
-                const stored = localStorage.getItem('admin-photos');
-                if (stored) {
-                    adminPhotos = JSON.parse(stored);
-                    console.log('✅ Successfully parsed', adminPhotos.length, 'photos from localStorage (fallback)');
-                } else {
-                    console.log('No photos found in localStorage');
-                }
-            } catch (e) {
-                console.error('❌ Error parsing admin photos from localStorage:', e);
-                console.error('Raw data length:', localStorage.getItem('admin-photos')?.length || 0);
-                return;
-            }
+            console.log('No photos found in database');
         }
         
         console.log('Loading admin photos:', adminPhotos.length);

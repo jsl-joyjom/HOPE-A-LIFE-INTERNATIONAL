@@ -406,9 +406,11 @@
                     return [];
                 }
                 
+                // Only fetch published quotes
                 const { data: quotes, error } = await window.supabase
                     .from('daily_quotes')
                     .select('*')
+                    .eq('status', 'published')
                     .order('date', { ascending: true, nullsFirst: true });
                 
                 if (error) throw error;
@@ -430,9 +432,11 @@
                     return [];
                 }
                 
+                // Only fetch published verses
                 const { data: verses, error } = await window.supabase
                     .from('daily_verses')
                     .select('*')
+                    .eq('status', 'published')
                     .order('date', { ascending: true, nullsFirst: true });
                 
                 if (error) throw error;
@@ -467,12 +471,10 @@
             // Find quotes without dates (general quotes)
             const generalQuotes = quotes.filter(q => !q.date || q.date === '');
             
-            // If no quotes, return default
+            // If no quotes, return null (don't show dev placeholder)
+            // The frontend should handle empty state gracefully
             if (generalQuotes.length === 0 && quotes.length === 0) {
-                return {
-                    text: "Hope is being able to see that there is light despite all of the darkness.",
-                    author: "Desmond Tutu"
-                };
+                return null;
             }
             
             // Use general quotes or all quotes
@@ -503,12 +505,10 @@
             // Find verses without dates (general verses)
             const generalVerses = verses.filter(v => !v.date || v.date === '');
             
-            // If no verses, return default
+            // If no verses, return null (don't show dev placeholder)
+            // The frontend should handle empty state gracefully
             if (generalVerses.length === 0 && verses.length === 0) {
-                return {
-                    text: "For I know the plans I have for you, declares the Lord, plans to prosper you and not to harm you, plans to give you hope and a future.",
-                    reference: "Jeremiah 29:11"
-                };
+                return null;
             }
             
             // Use general verses or all verses
@@ -578,7 +578,8 @@
                     verseTextEl.innerHTML = '<p>' + verse.text + '</p>';
                     verseReferenceEl.textContent = verse.reference ? '— ' + verse.reference : '';
                 } else {
-                    verseTextEl.innerHTML = '<p>' + (verse || '') + '</p>';
+                    // Show loading or empty state instead of dev placeholder
+                    verseTextEl.innerHTML = '<p style="color: var(--text-secondary); font-style: italic;">Loading verse of the day...</p>';
                     verseReferenceEl.textContent = '';
                 }
                 
@@ -627,11 +628,26 @@
             }
         }
         
+        // Function to force refresh verses
+        async function refreshVerses() {
+            console.log('🔄 Refreshing verses from Supabase');
+            cachedVerses = []; // Clear cache
+            const verses = await getVersesFromSupabase();
+            cachedVerses = verses;
+            if (currentQuoteType === 'verse') {
+                await displayVerse();
+            }
+        }
+        
         // Listen for admin updates
         window.addEventListener('admin-content-updated', function(e) {
             if (e.detail && e.detail.type === 'quotes') {
                 console.log('🔄 Admin updated quotes - refreshing display');
                 refreshQuotes();
+            }
+            if (e.detail && e.detail.type === 'verses') {
+                console.log('🔄 Admin updated verses - refreshing display');
+                refreshVerses();
             }
         });
         
@@ -641,12 +657,17 @@
                 console.log('🔄 Storage event - refreshing quotes');
                 refreshQuotes();
             }
+            if (e.key === 'verses-updated') {
+                console.log('🔄 Storage event - refreshing verses');
+                refreshVerses();
+            }
         });
         
         // Poll for updates every 10 seconds (fallback)
         setInterval(function() {
             if (document.visibilityState === 'visible') {
                 refreshQuotes();
+                refreshVerses();
             }
         }, 10000);
         

@@ -116,6 +116,7 @@ CREATE TABLE IF NOT EXISTS news (
     link TEXT,
     source TEXT,
     author TEXT,
+    status TEXT DEFAULT 'published' CHECK (status IN ('draft', 'published')),
     date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -159,6 +160,7 @@ CREATE TABLE IF NOT EXISTS daily_quotes (
     text TEXT NOT NULL,
     author TEXT,
     date DATE, -- Optional: for scheduling quotes on specific dates
+    status TEXT DEFAULT 'published' CHECK (status IN ('draft', 'published')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -171,6 +173,7 @@ CREATE TABLE IF NOT EXISTS daily_verses (
     text TEXT NOT NULL,
     reference TEXT, -- Bible reference (e.g., "John 3:16")
     date DATE, -- Optional: for scheduling verses on specific dates
+    status TEXT DEFAULT 'published' CHECK (status IN ('draft', 'published')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -219,6 +222,30 @@ CREATE TABLE IF NOT EXISTS email_logs (
 );
 
 -- ============================================
+-- 14. TESTIMONIAL COMMENTS TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS testimonial_comments (
+    id BIGSERIAL PRIMARY KEY,
+    testimonial_id BIGINT NOT NULL REFERENCES testimonials(id) ON DELETE CASCADE,
+    author TEXT NOT NULL DEFAULT 'Anonymous',
+    email TEXT,
+    text TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- 15. TESTIMONIAL LIKES TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS testimonial_likes (
+    id BIGSERIAL PRIMARY KEY,
+    testimonial_id BIGINT NOT NULL REFERENCES testimonials(id) ON DELETE CASCADE,
+    user_identifier TEXT, -- Can be IP, session ID, or user ID
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(testimonial_id, user_identifier)
+);
+
+-- ============================================
 -- INDEXES FOR PERFORMANCE
 -- ============================================
 
@@ -251,6 +278,13 @@ CREATE INDEX IF NOT EXISTS idx_daily_verses_date ON daily_verses(date);
 CREATE INDEX IF NOT EXISTS idx_pending_stories_status ON pending_stories(status);
 CREATE INDEX IF NOT EXISTS idx_pending_stories_submitted_at ON pending_stories(submitted_at DESC);
 
+-- Quotes and verses status indexes (for filtering published content)
+CREATE INDEX IF NOT EXISTS idx_daily_quotes_status ON daily_quotes(status);
+CREATE INDEX IF NOT EXISTS idx_daily_verses_status ON daily_verses(status);
+
+-- News status index (for filtering published content)
+CREATE INDEX IF NOT EXISTS idx_news_status ON news(status);
+
 -- Contact messages indexes
 CREATE INDEX IF NOT EXISTS idx_contact_messages_status ON contact_messages(status);
 CREATE INDEX IF NOT EXISTS idx_contact_messages_created_at ON contact_messages(created_at DESC);
@@ -262,6 +296,14 @@ CREATE INDEX IF NOT EXISTS idx_photos_created_at ON photos(created_at DESC);
 -- Videos indexes
 CREATE INDEX IF NOT EXISTS idx_videos_date ON videos(date DESC);
 CREATE INDEX IF NOT EXISTS idx_videos_created_at ON videos(created_at DESC);
+
+-- Testimonial comments indexes
+CREATE INDEX IF NOT EXISTS idx_testimonial_comments_testimonial_id ON testimonial_comments(testimonial_id);
+CREATE INDEX IF NOT EXISTS idx_testimonial_comments_created_at ON testimonial_comments(created_at DESC);
+
+-- Testimonial likes indexes
+CREATE INDEX IF NOT EXISTS idx_testimonial_likes_testimonial_id ON testimonial_likes(testimonial_id);
+CREATE INDEX IF NOT EXISTS idx_testimonial_likes_user_identifier ON testimonial_likes(user_identifier);
 
 -- ============================================
 -- TRIGGERS FOR UPDATED_AT TIMESTAMPS
@@ -304,6 +346,9 @@ CREATE TRIGGER update_daily_quotes_updated_at BEFORE UPDATE ON daily_quotes
 CREATE TRIGGER update_daily_verses_updated_at BEFORE UPDATE ON daily_verses
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER update_testimonial_comments_updated_at BEFORE UPDATE ON testimonial_comments
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- ============================================
 -- ROW LEVEL SECURITY (RLS) POLICIES
 -- ============================================
@@ -325,6 +370,8 @@ ALTER TABLE daily_verses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pending_stories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE contact_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE email_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE testimonial_comments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE testimonial_likes ENABLE ROW LEVEL SECURITY;
 
 -- Public read access (for website visitors)
 -- Admin write access (you'll need to set up authentication first)
@@ -339,6 +386,8 @@ CREATE POLICY "Public read access" ON news FOR SELECT USING (true);
 CREATE POLICY "Public read access" ON publications FOR SELECT USING (true);
 CREATE POLICY "Public read access" ON daily_quotes FOR SELECT USING (true);
 CREATE POLICY "Public read access" ON daily_verses FOR SELECT USING (true);
+CREATE POLICY "Public read access" ON testimonial_comments FOR SELECT USING (true);
+CREATE POLICY "Public read access" ON testimonial_likes FOR SELECT USING (true);
 
 -- Allow all operations for now (you'll restrict this later with proper auth)
 CREATE POLICY "Allow all operations" ON testimonials FOR ALL USING (true);
@@ -351,6 +400,8 @@ CREATE POLICY "Allow all operations" ON pending_news FOR ALL USING (true);
 CREATE POLICY "Allow all operations" ON publications FOR ALL USING (true);
 CREATE POLICY "Allow all operations" ON daily_quotes FOR ALL USING (true);
 CREATE POLICY "Allow all operations" ON daily_verses FOR ALL USING (true);
+CREATE POLICY "Allow all operations" ON testimonial_comments FOR ALL USING (true);
+CREATE POLICY "Allow all operations" ON testimonial_likes FOR ALL USING (true);
 CREATE POLICY "Allow all operations" ON pending_stories FOR ALL USING (true);
 CREATE POLICY "Allow all operations" ON contact_messages FOR ALL USING (true);
 CREATE POLICY "Allow all operations" ON email_logs FOR ALL USING (true);
