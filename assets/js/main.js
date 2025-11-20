@@ -964,10 +964,22 @@ const initScrollAnimations = () => {
                 }
             });
         },
-        { threshold: 0.3 }
+        { threshold: 0.1 } // Lower threshold for better detection
     );
 
-    animatedElements.forEach((element) => observer.observe(element));
+    // Check if elements are already in view on page load (especially for hero section)
+    animatedElements.forEach((element) => {
+        const rect = element.getBoundingClientRect();
+        const isInView = rect.top < window.innerHeight && rect.bottom > 0;
+        
+        if (isInView) {
+            // Element is already visible, show it immediately
+            element.classList.add('is-visible');
+        } else {
+            // Element is not in view yet, observe it
+            observer.observe(element);
+        }
+    });
 
     prefersReducedMotion.addEventListener('change', () => {
         if (prefersReducedMotion.matches) {
