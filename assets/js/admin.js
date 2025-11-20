@@ -258,34 +258,55 @@ function editTestimonial(index) {
 }
 
 // Photos Management
-function loadPhotos(searchTerm = '') {
-    const photos = JSON.parse(localStorage.getItem('admin-photos') || '[]');
-    const list = document.getElementById('photos-list');
-    
-    // Filter photos if search term provided
-    let filteredPhotos = photos;
-    if (searchTerm.trim()) {
-        const searchLower = searchTerm.toLowerCase();
-        filteredPhotos = photos.filter(photo => 
-            (photo.title && photo.title.toLowerCase().includes(searchLower)) ||
-            (photo.description && photo.description.toLowerCase().includes(searchLower)) ||
-            (photo.alt && photo.alt.toLowerCase().includes(searchLower))
-        );
-    }
-    
-    if (filteredPhotos.length === 0) {
-        list.innerHTML = searchTerm.trim()
-            ? `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No photos found matching "${searchTerm}"</p>`
-            : '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No photos added yet. Add one above!</p>';
-        return;
-    }
-    
-    // Sort by date (newest first)
-    const sortedPhotos = [...filteredPhotos].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
-    
-    list.innerHTML = sortedPhotos.map((photo, index) => {
-        // Find original index for edit/delete functions
-        const originalIndex = photos.findIndex(p => p.id === photo.id);
+async function loadPhotos(searchTerm = '') {
+    try {
+        if (!window.supabase) {
+            console.error('Supabase client not available');
+            const list = document.getElementById('photos-list');
+            list.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">⚠️ Database connection not available. Please refresh the page.</p>';
+            return;
+        }
+
+        // Fetch photos from Supabase
+        let query = window.supabase
+            .from('photos')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        const { data: photos, error } = await query;
+
+        if (error) throw error;
+
+        const list = document.getElementById('photos-list');
+        
+        // Filter photos if search term provided
+        let filteredPhotos = photos || [];
+        if (searchTerm.trim()) {
+            const searchLower = searchTerm.toLowerCase();
+            filteredPhotos = filteredPhotos.filter(photo => 
+                (photo.title && photo.title.toLowerCase().includes(searchLower)) ||
+                (photo.description && photo.description.toLowerCase().includes(searchLower)) ||
+                (photo.alt && photo.alt.toLowerCase().includes(searchLower))
+            );
+        }
+        
+        if (filteredPhotos.length === 0) {
+            list.innerHTML = searchTerm.trim()
+                ? `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No photos found matching "${searchTerm}"</p>`
+                : '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No photos added yet. Add one above!</p>';
+            return;
+        }
+        
+        // Sort by date (newest first) - already sorted by created_at, but use date field if available
+        const sortedPhotos = [...filteredPhotos].sort((a, b) => {
+            const dateA = a.date ? new Date(a.date) : new Date(a.created_at);
+            const dateB = b.date ? new Date(b.date) : new Date(b.created_at);
+            return dateB - dateA;
+        });
+        
+        list.innerHTML = sortedPhotos.map((photo, index) => {
+            // Use photo.id for edit/delete functions (Supabase auto-generates IDs)
+            const photoId = photo.id;
         const photoDate = photo.date ? new Date(photo.date).toLocaleDateString('en-US', { 
             year: 'numeric', 
             month: 'short', 
@@ -321,26 +342,31 @@ function loadPhotos(searchTerm = '') {
                 </div>
             </div>
             <div class="photo-list-actions">
-                <button class="btn btn-secondary btn-sm" onclick="viewPhotoDetails(${originalIndex})" title="View Details">
+                <button class="btn btn-secondary btn-sm" onclick="viewPhotoDetails(${photoId})" title="View Details">
                     <i class="fas fa-eye"></i> View More
                 </button>
-                <button class="btn btn-primary btn-sm" onclick="editPhoto(${originalIndex})" title="Edit Photo">
+                <button class="btn btn-primary btn-sm" onclick="editPhoto(${photoId})" title="Edit Photo">
                     <i class="fas fa-edit"></i> Edit
                 </button>
-                <button class="btn btn-danger btn-sm" onclick="deletePhoto(${originalIndex})" title="Delete Photo">
+                <button class="btn btn-danger btn-sm" onclick="deletePhoto(${photoId})" title="Delete Photo">
                     <i class="fas fa-trash"></i> Delete
                 </button>
             </div>
         </div>
         `;
     }).join('');
+    } catch (error) {
+        console.error('Error loading photos:', error);
+        const list = document.getElementById('photos-list');
+        list.innerHTML = '<p style="text-align: center; color: var(--text-danger); padding: 2rem;">❌ Error loading photos. Please try again.</p>';
+    }
 }
 
 document.getElementById('photo-form').addEventListener('submit', (e) => {
     e.preventDefault();
     
     const form = document.getElementById('photo-form');
-    const editingIndex = form.getAttribute('data-editing-index');
+    const editingId = form.getAttribute('data-editing-id'); // Changed from data-editing-index
     
     const photoFile = document.getElementById('photo-file').files[0];
     let photoUrl = document.getElementById('photo-url').value;
@@ -350,8 +376,8 @@ document.getElementById('photo-form').addEventListener('submit', (e) => {
         const reader = new FileReader();
         reader.onload = (e) => {
             photoUrl = e.target.result;
-            if (editingIndex !== null) {
-                updatePhoto(parseInt(editingIndex), photoUrl);
+            if (editingId !== null) {
+                updatePhoto(parseInt(editingId), photoUrl); // Pass ID instead of index
             } else {
                 savePhoto(photoUrl);
             }
@@ -360,72 +386,81 @@ document.getElementById('photo-form').addEventListener('submit', (e) => {
             showAlert('photo-alert', '❌ Error reading file. Please try again.', 'error');
         };
         reader.readAsDataURL(photoFile);
-    } else if (!photoUrl && editingIndex === null) {
+    } else if (!photoUrl && editingId === null) {
         // Only require URL for new photos, not when editing (keep existing URL)
         showAlert('photo-alert', '⚠️ Please provide either a photo URL or upload a file.', 'error');
         return;
     } else {
-        if (editingIndex !== null) {
-            updatePhoto(parseInt(editingIndex), photoUrl);
+        if (editingId !== null) {
+            updatePhoto(parseInt(editingId), photoUrl); // Pass ID instead of index
         } else {
             savePhoto(photoUrl);
         }
     }
 });
 
-function updatePhoto(index, photoUrl) {
+async function updatePhoto(photoId, photoUrl) {
     try {
-        const photos = JSON.parse(localStorage.getItem('admin-photos') || '[]');
-        const existingPhoto = photos[index];
-        
-        if (!existingPhoto) {
-            showAlert('photo-alert', '❌ Photo not found.', 'error');
+        if (!window.supabase) {
+            showAlert('photo-alert', '❌ Database connection not available. Please refresh the page.', 'error');
             return;
         }
-        
-        // Update photo data
-        const updatedPhoto = {
-            ...existingPhoto,
+
+        // Prepare update data
+        const updateData = {
             title: document.getElementById('photo-title').value,
             description: document.getElementById('photo-description').value,
-            alt: document.getElementById('photo-alt').value || document.getElementById('photo-title').value,
-            updatedAt: new Date().toISOString()
+            alt: document.getElementById('photo-alt').value || document.getElementById('photo-title').value
         };
         
         // Only update URL if a new one was provided
         if (photoUrl) {
-            updatedPhoto.url = photoUrl;
+            updateData.url = photoUrl;
         }
         
-        photos[index] = updatedPhoto;
-        localStorage.setItem('admin-photos', JSON.stringify(photos));
+        // Update photo in Supabase
+        const { data, error } = await window.supabase
+            .from('photos')
+            .update(updateData)
+            .eq('id', photoId)
+            .select();
+        
+        if (error) throw error;
+        
+        if (!data || data.length === 0) {
+            showAlert('photo-alert', '❌ Photo not found.', 'error');
+            return;
+        }
         
         showAlert('photo-alert', '✅ Photo updated successfully!', 'success');
         
-        // Trigger real-time update event
-        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'photos' } }));
-        
         // Reset form
         document.getElementById('photo-form').reset();
-        document.getElementById('photo-form').removeAttribute('data-editing-index');
+        document.getElementById('photo-form').removeAttribute('data-editing-id');
         const submitBtn = document.querySelector('#photo-form button[type="submit"]');
         const originalHTML = submitBtn.getAttribute('data-original-html') || '<i class="fas fa-upload"></i> Add Photo';
         submitBtn.innerHTML = originalHTML;
         submitBtn.removeAttribute('data-original-html');
         
-        loadPhotos();
+        await loadPhotos();
+        
+        // Trigger real-time update event
         window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'photos' } }));
         
     } catch (error) {
         console.error('Error updating photo:', error);
-        showAlert('photo-alert', '❌ Error updating photo. Please try again.', 'error');
+        showAlert('photo-alert', `❌ Error updating photo: ${error.message || 'Please try again.'}`, 'error');
     }
 }
 
-function savePhoto(photoUrl) {
+async function savePhoto(photoUrl) {
     try {
+        if (!window.supabase) {
+            showAlert('photo-alert', '❌ Database connection not available. Please refresh the page.', 'error');
+            return;
+        }
+
         const photo = {
-            id: Date.now() + Math.random(), // Ensure unique ID
             title: document.getElementById('photo-title').value,
             description: document.getElementById('photo-description').value,
             url: photoUrl,
@@ -433,90 +468,56 @@ function savePhoto(photoUrl) {
             date: new Date().toISOString()
         };
         
-        console.log('Saving photo:', photo);
+        console.log('Saving photo to Supabase:', { ...photo, urlLength: photo.url.length });
         
-        // Get existing photos
-        let photos = [];
-        try {
-            const stored = localStorage.getItem('admin-photos');
-            if (stored) {
-                photos = JSON.parse(stored);
-            }
-        } catch (e) {
-            console.warn('Error parsing existing photos, starting fresh:', e);
-            photos = [];
-        }
+        // Insert photo into Supabase
+        const { data, error } = await window.supabase
+            .from('photos')
+            .insert([photo])
+            .select();
         
-        // Add new photo
-        photos.push(photo);
+        if (error) throw error;
         
-        // Save to localStorage
-        try {
-            localStorage.setItem('admin-photos', JSON.stringify(photos));
-            
-            // Verify it was saved
-            const verify = localStorage.getItem('admin-photos');
-            if (!verify) {
-                throw new Error('Failed to save to localStorage');
-            }
-            
-            const parsedVerify = JSON.parse(verify);
-            console.log('✅ Photo saved to localStorage. Total photos:', photos.length);
-            console.log('✅ Verification - localStorage now contains:', parsedVerify.length, 'photos');
-            
-            // Trigger real-time update event
-            window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'photos' } }));
-            
-            // Log photo info without full base64
-            const photoInfo = {
-                id: photo.id,
-                title: photo.title,
-                urlLength: photo.url.length,
-                urlType: photo.url.startsWith('data:') ? 'base64' : 'url',
-                urlPreview: photo.url.substring(0, 50) + '...'
-            };
-            console.log('✅ Saved photo details:', photoInfo);
-            
-        } catch (e) {
-            console.error('Error writing to localStorage:', e);
-            if (e.name === 'QuotaExceededError') {
-                showAlert('photo-alert', '❌ Storage quota exceeded. Please clear some data and try again.', 'error');
-                return;
-            }
-            throw e;
-        }
+        console.log('✅ Photo saved to Supabase:', data);
         
         showAlert('photo-alert', '✅ Photo added successfully! It will appear on the Gallery page. <a href="gallery.html" target="_blank" style="color: inherit; text-decoration: underline;">View Gallery</a>', 'success');
         document.getElementById('photo-form').reset();
-        document.getElementById('photo-form').removeAttribute('data-editing-index');
+        document.getElementById('photo-form').removeAttribute('data-editing-id');
         const submitBtn = document.querySelector('#photo-form button[type="submit"]');
         if (submitBtn.getAttribute('data-original-html')) {
             const originalHTML = submitBtn.getAttribute('data-original-html');
             submitBtn.innerHTML = originalHTML;
             submitBtn.removeAttribute('data-original-html');
         }
-        loadPhotos();
         
-        // Trigger custom event for same-tab updates
+        await loadPhotos();
+        
+        // Trigger custom event for real-time updates
         window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'photos' } }));
-        
-        // Also trigger storage event simulation for cross-tab
-        window.dispatchEvent(new CustomEvent('photos-updated', { detail: { count: photos.length } }));
         
     } catch (error) {
         console.error('❌ Error saving photo:', error);
-        showAlert('photo-alert', '❌ Error saving photo. Please try again.', 'error');
+        showAlert('photo-alert', `❌ Error saving photo: ${error.message || 'Please try again.'}`, 'error');
     }
 }
 
-function viewPhotoDetails(index) {
-    const photos = JSON.parse(localStorage.getItem('admin-photos') || '[]');
-    const photo = photos[index];
-    
-    if (!photo) {
-        showAlert('photo-alert', '❌ Photo not found.', 'error');
-        return;
-    }
+async function viewPhotoDetails(photoId) {
+    try {
+        if (!window.supabase) {
+            showAlert('photo-alert', '❌ Database connection not available. Please refresh the page.', 'error');
+            return;
+        }
+
+        const { data: photo, error } = await window.supabase
+            .from('photos')
+            .select('*')
+            .eq('id', photoId)
+            .single();
+        
+        if (error || !photo) {
+            showAlert('photo-alert', '❌ Photo not found.', 'error');
+            return;
+        }
     
     // Create or get modal
     let modal = document.getElementById('photo-details-modal');
@@ -615,27 +616,40 @@ function viewPhotoDetails(index) {
     // Show modal
     modal.classList.add('active');
     document.body.style.overflow = 'hidden';
+    } catch (error) {
+        console.error('Error viewing photo details:', error);
+        showAlert('photo-alert', '❌ Error loading photo details.', 'error');
+    }
 }
 
-function editPhoto(index) {
-    const photos = JSON.parse(localStorage.getItem('admin-photos') || '[]');
-    const photo = photos[index];
-    
-    if (!photo) {
-        showAlert('photo-alert', '❌ Photo not found.', 'error');
-        return;
-    }
-    
-    // Populate form with photo data
-    document.getElementById('photo-title').value = photo.title || '';
-    document.getElementById('photo-description').value = photo.description || '';
-    document.getElementById('photo-url').value = photo.url && !photo.url.startsWith('data:image/') ? photo.url : '';
-    document.getElementById('photo-alt').value = photo.alt || '';
-    document.getElementById('photo-file').value = ''; // Clear file input
-    
-    // Store the index being edited
-    const form = document.getElementById('photo-form');
-    form.setAttribute('data-editing-index', index);
+async function editPhoto(photoId) {
+    try {
+        if (!window.supabase) {
+            showAlert('photo-alert', '❌ Database connection not available. Please refresh the page.', 'error');
+            return;
+        }
+
+        const { data: photo, error } = await window.supabase
+            .from('photos')
+            .select('*')
+            .eq('id', photoId)
+            .single();
+        
+        if (error || !photo) {
+            showAlert('photo-alert', '❌ Photo not found.', 'error');
+            return;
+        }
+        
+        // Populate form with photo data
+        document.getElementById('photo-title').value = photo.title || '';
+        document.getElementById('photo-description').value = photo.description || '';
+        document.getElementById('photo-url').value = photo.url && !photo.url.startsWith('data:image/') ? photo.url : '';
+        document.getElementById('photo-alt').value = photo.alt || '';
+        document.getElementById('photo-file').value = ''; // Clear file input
+        
+        // Store the ID being edited (changed from index to ID)
+        const form = document.getElementById('photo-form');
+        form.setAttribute('data-editing-id', photoId);
     
     // Change submit button text
     const submitBtn = form.querySelector('button[type="submit"]');
@@ -649,21 +663,40 @@ function editPhoto(index) {
     showAlert('photo-alert', '📝 Editing photo. Update the fields and click "Update Photo" to save changes.', 'info');
 }
 
-function deletePhoto(index) {
-    const photos = JSON.parse(localStorage.getItem('admin-photos') || '[]');
-    const photo = photos[index];
-    
-    if (!photo) {
-        showAlert('photo-alert', '❌ Photo not found.', 'error');
-        return;
-    }
-    
-    if (confirm(`Are you sure you want to delete "${photo.title || 'this photo'}"? This action cannot be undone.`)) {
-        photos.splice(index, 1);
-        localStorage.setItem('admin-photos', JSON.stringify(photos));
-        loadPhotos();
-        showAlert('photo-alert', '✅ Photo deleted successfully.', 'success');
-        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'photos' } }));
+async function deletePhoto(photoId) {
+    try {
+        if (!window.supabase) {
+            showAlert('photo-alert', '❌ Database connection not available. Please refresh the page.', 'error');
+            return;
+        }
+
+        // First, get the photo to show its title in confirmation
+        const { data: photoData, error: fetchError } = await window.supabase
+            .from('photos')
+            .select('title')
+            .eq('id', photoId)
+            .single();
+        
+        if (fetchError || !photoData) {
+            showAlert('photo-alert', '❌ Photo not found.', 'error');
+            return;
+        }
+        
+        if (confirm(`Are you sure you want to delete "${photoData.title || 'this photo'}"? This action cannot be undone.`)) {
+            const { error } = await window.supabase
+                .from('photos')
+                .delete()
+                .eq('id', photoId);
+            
+            if (error) throw error;
+            
+            await loadPhotos();
+            showAlert('photo-alert', '✅ Photo deleted successfully.', 'success');
+            window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'photos' } }));
+        }
+    } catch (error) {
+        console.error('Error deleting photo:', error);
+        showAlert('photo-alert', `❌ Error deleting photo: ${error.message || 'Please try again.'}`, 'error');
     }
 }
 
@@ -2679,4 +2712,5 @@ document.addEventListener('DOMContentLoaded', () => {
 // Load initial content
 loadTabContent('testimonials');
 updatePendingCount();
+
 
