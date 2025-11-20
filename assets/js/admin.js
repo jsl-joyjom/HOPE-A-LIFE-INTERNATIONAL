@@ -1167,34 +1167,45 @@ function loadPendingStories(searchTerm = '') {
     }).join('');
 }
 
-function approveStory(index) {
-    const pendingStories = JSON.parse(localStorage.getItem('pending-stories') || '[]');
-    const story = pendingStories[index];
-    
-    // Convert to testimonial format
-    const testimonial = {
-        id: story.id,
-        name: story.name,
-        role: story.program || 'Community Member',
-        quote: story.story,
-        tags: story.program || 'Stories of Transformation',
-        date: new Date().toISOString()
-    };
-    
-    // Add to testimonials
-    const testimonials = JSON.parse(localStorage.getItem('admin-testimonials') || '[]');
-    testimonials.push(testimonial);
-    localStorage.setItem('admin-testimonials', JSON.stringify(testimonials));
-    
-    // Update story status
-    story.status = 'approved';
-    story.approvedAt = new Date().toISOString();
-    pendingStories[index] = story;
-    localStorage.setItem('pending-stories', JSON.stringify(pendingStories));
-    
-    showAlert('testimonial-alert', '✅ Story approved and posted! <a href="impact.html" target="_blank" style="color: inherit; text-decoration: underline;">View on Impact Page</a>', 'success');
-    loadPendingStories();
-    window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'testimonials' } }));
+async function approveStory(index) {
+    try {
+        const pendingStories = JSON.parse(localStorage.getItem('pending-stories') || '[]');
+        const story = pendingStories[index];
+        
+        if (!window.supabase) {
+            showAlert('testimonial-alert', '❌ Database connection not available. Please refresh the page.', 'error');
+            return;
+        }
+        
+        // Convert to testimonial format
+        const testimonialData = {
+            name: story.name,
+            role: story.program || 'Community Member',
+            quote: story.story,
+            tags: story.program || 'Stories of Transformation'
+        };
+        
+        // Insert testimonial into Supabase
+        const { error: insertError } = await window.supabase
+            .from('testimonials')
+            .insert([testimonialData]);
+        
+        if (insertError) throw insertError;
+        
+        // Update story status in localStorage (pending stories are still in localStorage)
+        story.status = 'approved';
+        story.approvedAt = new Date().toISOString();
+        pendingStories[index] = story;
+        localStorage.setItem('pending-stories', JSON.stringify(pendingStories));
+        
+        showAlert('testimonial-alert', '✅ Story approved and posted! <a href="impact.html" target="_blank" style="color: inherit; text-decoration: underline;">View on Impact Page</a>', 'success');
+        loadPendingStories();
+        await loadTestimonials(); // Reload testimonials from Supabase
+        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'testimonials' } }));
+    } catch (error) {
+        console.error('Error approving story:', error);
+        showAlert('testimonial-alert', `❌ Error approving story: ${error.message || 'Please try again.'}`, 'error');
+    }
 }
 
 function rejectStory(index) {
@@ -1962,17 +1973,27 @@ function viewAttendeeDetails(registrationId) {
 }
 
 // Bulk Email Functionality
-function openBulkEmailModal(eventId) {
-    const registrations = JSON.parse(localStorage.getItem('event-registrations') || '[]');
-    const eventRegistrations = registrations.filter(reg => reg.eventId.toString() === eventId.toString());
-    const events = JSON.parse(localStorage.getItem('admin-events') || '[]');
-    const event = events.find(e => (e.id || '').toString() === eventId.toString());
-    
-    if (!event) {
-        alert('Event not found.');
-        return;
-    }
-    
+async function openBulkEmailModal(eventId) {
+    try {
+        const registrations = JSON.parse(localStorage.getItem('event-registrations') || '[]');
+        const eventRegistrations = registrations.filter(reg => reg.eventId.toString() === eventId.toString());
+        
+        if (!window.supabase) {
+            alert('Database connection not available.');
+            return;
+        }
+
+        const { data: event, error } = await window.supabase
+            .from('events')
+            .select('*')
+            .eq('id', eventId)
+            .single();
+        
+        if (error || !event) {
+            alert('Event not found.');
+            return;
+        }
+        
         if (eventRegistrations.length === 0) {
             alert('No registrations found for this event.');
             return;
@@ -2136,9 +2157,13 @@ Hope A Life International`;
             document.removeEventListener('keydown', escapeHandler);
         }
     };
-    document.addEventListener('keydown', escapeHandler);
-    
-    document.body.appendChild(modal);
+        document.addEventListener('keydown', escapeHandler);
+        
+        document.body.appendChild(modal);
+    } catch (error) {
+        console.error('Error opening bulk email modal:', error);
+        alert('Error loading event. Please try again.');
+    }
 }
 
 function sendBulkEmails(eventId, subject, message, recipientList, cardFile, modal) {
