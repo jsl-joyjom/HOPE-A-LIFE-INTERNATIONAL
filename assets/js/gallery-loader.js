@@ -22,38 +22,68 @@
         }
     });
     
-    function loadAdminPhotos() {
+    async function loadAdminPhotos() {
         const galleryGrid = document.querySelector('.gallery-grid');
         if (!galleryGrid) {
             console.warn('Gallery grid not found');
             return;
         }
         
-        // Get and parse photos with error handling
+        // Try to load from Supabase first, fallback to localStorage
         let adminPhotos = [];
-        try {
-            const stored = localStorage.getItem('admin-photos');
-            if (stored) {
-                adminPhotos = JSON.parse(stored);
-                console.log('✅ Successfully parsed', adminPhotos.length, 'photos from localStorage');
+        
+        // Check if Supabase is available
+        if (window.supabase) {
+            try {
+                console.log('📡 Loading photos from Supabase...');
+                const { data, error } = await window.supabase
+                    .from('photos')
+                    .select('*')
+                    .order('created_at', { ascending: false });
                 
-                // Log each photo's info (without the full base64 URL)
-                adminPhotos.forEach((photo, i) => {
-                    const urlPreview = photo.url ? (photo.url.substring(0, 50) + '...') : 'NO URL';
-                    console.log(`Photo ${i + 1}:`, {
-                        id: photo.id,
-                        title: photo.title,
-                        urlLength: photo.url ? photo.url.length : 0,
-                        urlPreview: urlPreview
+                if (error) {
+                    console.warn('⚠️ Supabase error, falling back to localStorage:', error);
+                    throw error; // Will trigger fallback
+                }
+                
+                if (data && data.length > 0) {
+                    adminPhotos = data;
+                    console.log('✅ Successfully loaded', adminPhotos.length, 'photos from Supabase');
+                    
+                    // Log each photo's info (without the full base64 URL)
+                    adminPhotos.forEach((photo, i) => {
+                        const urlPreview = photo.url ? (photo.url.substring(0, 50) + '...') : 'NO URL';
+                        console.log(`Photo ${i + 1}:`, {
+                            id: photo.id,
+                            title: photo.title,
+                            urlLength: photo.url ? photo.url.length : 0,
+                            urlPreview: urlPreview
+                        });
                     });
-                });
-            } else {
-                console.log('No photos found in localStorage');
+                } else {
+                    console.log('No photos found in Supabase');
+                }
+            } catch (supabaseError) {
+                console.warn('⚠️ Supabase unavailable, trying localStorage fallback...');
+                // Fall through to localStorage fallback
             }
-        } catch (e) {
-            console.error('❌ Error parsing admin photos from localStorage:', e);
-            console.error('Raw data length:', localStorage.getItem('admin-photos')?.length || 0);
-            return;
+        }
+        
+        // Fallback to localStorage if Supabase failed or not available
+        if (adminPhotos.length === 0) {
+            try {
+                const stored = localStorage.getItem('admin-photos');
+                if (stored) {
+                    adminPhotos = JSON.parse(stored);
+                    console.log('✅ Successfully parsed', adminPhotos.length, 'photos from localStorage (fallback)');
+                } else {
+                    console.log('No photos found in localStorage');
+                }
+            } catch (e) {
+                console.error('❌ Error parsing admin photos from localStorage:', e);
+                console.error('Raw data length:', localStorage.getItem('admin-photos')?.length || 0);
+                return;
+            }
         }
         
         console.log('Loading admin photos:', adminPhotos.length);

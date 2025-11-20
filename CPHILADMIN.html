@@ -1160,6 +1160,53 @@
     <script type="module" src="assets/js/supabase-config.js"></script>
     <script src="assets/js/admin.js"></script>
     <script>
+        // Admin Panel Supabase Connection Check
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                if (window.supabase) {
+                    console.log('✅ Admin Panel: Supabase connected');
+                    // Test connection
+                    window.supabase.from('photos').select('count').limit(1).then(({ error }) => {
+                        if (error) {
+                            console.error('❌ Admin Panel: Supabase connection test failed:', error);
+                            showAdminConnectionAlert('⚠️ Database connection issue. Some features may not work.', 'warning');
+                        } else {
+                            console.log('✅ Admin Panel: Supabase connection verified');
+                        }
+                    });
+                } else {
+                    console.error('❌ Admin Panel: Supabase not available');
+                    showAdminConnectionAlert('❌ Database not connected. Admin panel features will be limited. Please refresh the page.', 'error');
+                }
+            }, 2000); // Wait 2 seconds for Supabase to load
+        });
+        
+        function showAdminConnectionAlert(message, type) {
+            const alertDiv = document.createElement('div');
+            alertDiv.style.cssText = `
+                position: fixed;
+                top: 80px;
+                right: 20px;
+                background: ${type === 'error' ? '#ef4444' : '#f59e0b'};
+                color: white;
+                padding: 1rem 1.5rem;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                z-index: 10000;
+                max-width: 400px;
+                font-size: 0.9rem;
+            `;
+            alertDiv.textContent = message;
+            document.body.appendChild(alertDiv);
+            
+            setTimeout(() => {
+                alertDiv.style.opacity = '0';
+                alertDiv.style.transition = 'opacity 0.3s';
+                setTimeout(() => alertDiv.remove(), 300);
+            }, 5000);
+        }
+    </script>
+    <script>
         // Force refresh mechanism - ensures updates are visible immediately
         window.addEventListener('admin-content-updated', function(e) {
             console.log('🔄 Content updated, triggering refresh:', e.detail);
