@@ -1117,7 +1117,7 @@ function showAlert(containerId, message, type) {
 // Pending Stories Management
 async function loadPendingStories(searchTerm = '') {
     try {
-        console.log('Loading pending stories...');
+        console.log('📋 Loading pending stories...', searchTerm ? `(search: "${searchTerm}")` : '');
         
         if (!window.supabase) {
             const list = document.getElementById('pending-stories-list');
@@ -2743,8 +2743,8 @@ async function saveQuote() {
         const quoteData = {
             text: textInput.value.trim(),
             author: authorInput && authorInput.value.trim() ? authorInput.value.trim() : null,
-            date: dateInput && dateInput.value ? dateInput.value : null,
-            status: 'published' // Always publish when saving
+            date: dateInput && dateInput.value ? dateInput.value : null
+            // Note: status column will use default 'published' if it exists
         };
         
         const { error } = await window.supabase
@@ -2843,8 +2843,8 @@ async function updateQuote(quoteId) {
         const quoteData = {
             text: textInput.value.trim(),
             author: authorInput && authorInput.value.trim() ? authorInput.value.trim() : null,
-            date: dateInput && dateInput.value ? dateInput.value : null,
-            status: 'published' // Always publish when updating
+            date: dateInput && dateInput.value ? dateInput.value : null
+            // Note: status column will use default 'published' if it exists
         };
         
         const { error } = await window.supabase
@@ -3027,8 +3027,8 @@ async function saveVerse() {
         const verseData = {
             text: textInput.value.trim(),
             reference: referenceInput && referenceInput.value.trim() ? referenceInput.value.trim() : null,
-            date: dateInput && dateInput.value ? dateInput.value : null,
-            status: 'published' // Always publish when saving
+            date: dateInput && dateInput.value ? dateInput.value : null
+            // Note: status column will use default 'published' if it exists
         };
         
         const { error } = await window.supabase
@@ -3127,8 +3127,8 @@ async function updateVerse(verseId) {
         const verseData = {
             text: textInput.value.trim(),
             reference: referenceInput && referenceInput.value.trim() ? referenceInput.value.trim() : null,
-            date: dateInput && dateInput.value ? dateInput.value : null,
-            status: 'published' // Always publish when updating
+            date: dateInput && dateInput.value ? dateInput.value : null
+            // Note: status column will use default 'published' if it exists
         };
         
         const { error } = await window.supabase
@@ -3377,8 +3377,8 @@ document.getElementById('news-form').addEventListener('submit', async (e) => {
             link: document.getElementById('news-link').value || null,
             source: document.getElementById('news-source').value || null,
             author: document.getElementById('news-author') ? document.getElementById('news-author').value || null : null,
-            status: 'published', // Always publish when saving
             date: new Date().toISOString()
+            // Note: status column will use default 'published' if it exists
         };
         
         const { error } = await window.supabase
@@ -3434,8 +3434,8 @@ async function approveNews(newsId) {
             link: pendingNews.link || null,
             source: pendingNews.source || null,
             author: pendingNews.author || null,
-            status: 'published', // Always publish when approving
             date: new Date().toISOString()
+            // Note: status column will use default 'published' if it exists
         };
         
         const { error: insertError } = await window.supabase
@@ -3750,18 +3750,21 @@ async function updatePendingCount() {
 
 // Listen for new pending stories
 window.addEventListener('new-pending-story', (event) => {
-    console.log('New pending story event received:', event.detail);
+    console.log('✅ New pending story event received:', event.detail);
     updatePendingCount();
     const pendingTab = document.getElementById('pending-stories-tab');
     if (pendingTab && pendingTab.classList.contains('active')) {
+        console.log('🔄 Reloading pending stories (tab is active)');
         loadPendingStories();
+    } else {
+        console.log('ℹ️ Pending stories tab not active, badge will update when tab is opened');
     }
 });
 
 // Listen for storage events (cross-tab communication)
 window.addEventListener('storage', (event) => {
-    if (event.key === 'pending-stories') {
-        console.log('Storage event detected for pending-stories');
+    if (event.key === 'pending-stories-updated') {
+        console.log('Storage event detected for pending-stories-updated');
         updatePendingCount();
         const pendingTab = document.getElementById('pending-stories-tab');
         if (pendingTab && pendingTab.classList.contains('active')) {
@@ -3771,14 +3774,32 @@ window.addEventListener('storage', (event) => {
 });
 
 // Also listen for custom storage events (same-tab)
-window.addEventListener('pending-stories-updated', () => {
-    console.log('Pending stories updated event received');
+window.addEventListener('pending-stories-updated', (event) => {
+    console.log('✅ Pending stories updated event received', event.detail);
     updatePendingCount();
     const pendingTab = document.getElementById('pending-stories-tab');
     if (pendingTab && pendingTab.classList.contains('active')) {
+        console.log('🔄 Reloading pending stories (tab is active)');
         loadPendingStories();
+    } else {
+        console.log('ℹ️ Pending stories tab not active, badge will update when tab is opened');
     }
 });
+
+// Poll for new pending stories every 30 seconds as a fallback
+setInterval(async () => {
+    if (document.visibilityState === 'visible') {
+        const pendingTab = document.getElementById('pending-stories-tab');
+        if (pendingTab && pendingTab.classList.contains('active')) {
+            console.log('🔄 Polling: Refreshing pending stories');
+            await updatePendingCount();
+            await loadPendingStories();
+        } else {
+            // Just update the count badge even if tab isn't active
+            await updatePendingCount();
+        }
+    }
+}, 30000); // Check every 30 seconds
 
 // Search functionality - Add event listeners for all search inputs
 document.addEventListener('DOMContentLoaded', () => {

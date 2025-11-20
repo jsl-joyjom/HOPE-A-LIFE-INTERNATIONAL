@@ -206,11 +206,29 @@ const savePendingStory = async (storyData) => {
         // Debug logging
         console.log('✅ Story saved to Supabase:', insertedStory);
         console.log('✅ Story ID:', insertedStory[0]?.id);
+        console.log('✅ Story data:', JSON.stringify(insertedStory[0], null, 2));
         
-        // Trigger event for admin panel
+        // Trigger event for admin panel (works across tabs/windows)
         try {
-            window.dispatchEvent(new CustomEvent('new-pending-story', { detail: insertedStory[0] }));
-            window.dispatchEvent(new CustomEvent('pending-stories-updated', { detail: { count: 1 } }));
+            const storyEvent = new CustomEvent('new-pending-story', { 
+                detail: insertedStory[0],
+                bubbles: true 
+            });
+            window.dispatchEvent(storyEvent);
+            
+            const updateEvent = new CustomEvent('pending-stories-updated', { 
+                detail: { count: 1 },
+                bubbles: true 
+            });
+            window.dispatchEvent(updateEvent);
+            
+            // Also trigger storage event for cross-tab communication
+            try {
+                localStorage.setItem('pending-stories-updated', Date.now().toString());
+                localStorage.removeItem('pending-stories-updated');
+            } catch (e) {
+                console.warn('Could not set storage event:', e);
+            }
         } catch (e) {
             console.warn('Error dispatching events:', e);
         }
