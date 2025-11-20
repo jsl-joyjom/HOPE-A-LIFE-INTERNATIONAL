@@ -94,51 +94,67 @@ function loadTabContent(tab) {
 }
 
 // Testimonials Management
-function loadTestimonials(searchTerm = '') {
-    const testimonials = JSON.parse(localStorage.getItem('admin-testimonials') || '[]');
-    const list = document.getElementById('testimonials-list');
-    
-    // Filter testimonials if search term provided
-    let filteredTestimonials = testimonials;
-    if (searchTerm.trim()) {
-        const searchLower = searchTerm.toLowerCase();
-        filteredTestimonials = testimonials.filter(testimonial => 
-            (testimonial.name && testimonial.name.toLowerCase().includes(searchLower)) ||
-            (testimonial.role && testimonial.role.toLowerCase().includes(searchLower)) ||
-            (testimonial.quote && testimonial.quote.toLowerCase().includes(searchLower)) ||
-            (testimonial.tags && testimonial.tags.toLowerCase().includes(searchLower))
-        );
-    }
-    
-    if (filteredTestimonials.length === 0) {
-        list.innerHTML = searchTerm.trim() 
-            ? `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No testimonials found matching "${searchTerm}"</p>`
-            : '<p>No testimonials added yet. Add one above!</p>';
-        return;
-    }
-    
-    list.innerHTML = filteredTestimonials.map((testimonial, displayIndex) => {
-        // Find original index for edit/delete functions
-        const originalIndex = testimonials.findIndex(t => t.id === testimonial.id);
-        return `
-        <div class="item-card">
-            <div class="item-card-content">
-                <h3>${testimonial.name}</h3>
-                <p><strong>Role:</strong> ${testimonial.role}</p>
-                <p>${testimonial.quote.substring(0, 100)}...</p>
-                ${testimonial.tags ? `<p><strong>Tags:</strong> ${testimonial.tags}</p>` : ''}
+async function loadTestimonials(searchTerm = '') {
+    try {
+        if (!window.supabase) {
+            const list = document.getElementById('testimonials-list');
+            list.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Database connection not available. Please refresh the page.</p>';
+            return;
+        }
+
+        const { data: testimonials, error } = await window.supabase
+            .from('testimonials')
+            .select('*')
+            .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        
+        const list = document.getElementById('testimonials-list');
+        
+        // Filter testimonials if search term provided
+        let filteredTestimonials = testimonials || [];
+        if (searchTerm.trim()) {
+            const searchLower = searchTerm.toLowerCase();
+            filteredTestimonials = filteredTestimonials.filter(testimonial => 
+                (testimonial.name && testimonial.name.toLowerCase().includes(searchLower)) ||
+                (testimonial.role && testimonial.role.toLowerCase().includes(searchLower)) ||
+                (testimonial.quote && testimonial.quote.toLowerCase().includes(searchLower)) ||
+                (testimonial.tags && testimonial.tags.toLowerCase().includes(searchLower))
+            );
+        }
+        
+        if (filteredTestimonials.length === 0) {
+            list.innerHTML = searchTerm.trim() 
+                ? `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No testimonials found matching "${searchTerm}"</p>`
+                : '<p>No testimonials added yet. Add one above!</p>';
+            return;
+        }
+        
+        list.innerHTML = filteredTestimonials.map((testimonial) => {
+            return `
+            <div class="item-card">
+                <div class="item-card-content">
+                    <h3>${testimonial.name}</h3>
+                    <p><strong>Role:</strong> ${testimonial.role || 'N/A'}</p>
+                    <p>${testimonial.quote ? (testimonial.quote.length > 100 ? testimonial.quote.substring(0, 100) + '...' : testimonial.quote) : ''}</p>
+                    ${testimonial.tags ? `<p><strong>Tags:</strong> ${testimonial.tags}</p>` : ''}
+                </div>
+                <div class="item-card-actions">
+                    <button class="btn btn-secondary" onclick="editTestimonial(${testimonial.id})">
+                        <i class="fas fa-edit"></i> Edit
+                    </button>
+                    <button class="btn btn-danger" onclick="deleteTestimonial(${testimonial.id})">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </div>
             </div>
-            <div class="item-card-actions">
-                <button class="btn btn-secondary" onclick="editTestimonial(${originalIndex})">
-                    <i class="fas fa-edit"></i> Edit
-                </button>
-                <button class="btn btn-danger" onclick="deleteTestimonial(${originalIndex})">
-                    <i class="fas fa-trash"></i> Delete
-                </button>
-            </div>
-        </div>
-    `;
-    }).join('');
+        `;
+        }).join('');
+    } catch (error) {
+        console.error('Error loading testimonials:', error);
+        const list = document.getElementById('testimonials-list');
+        list.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Error loading testimonials. Please try again.</p>';
+    }
 }
 
 // Word count function
@@ -181,83 +197,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-document.getElementById('testimonial-form').addEventListener('submit', (e) => {
+document.getElementById('testimonial-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     
-    const quote = document.getElementById('testimonial-quote').value;
-    const wordCount = countWords(quote);
-    
-    // Validate word count (max 100 words)
-    if (wordCount > 100) {
-        showAlert('testimonial-alert', `❌ Error: Testimonial text exceeds the maximum of 100 words. Current count: ${wordCount} words. Please reduce it to 100 words or less.`, 'error');
-        return;
-    }
-    
-    if (wordCount === 0) {
-        showAlert('testimonial-alert', '❌ Error: Testimonial text is required.', 'error');
-        return;
-    }
-    
-    const testimonial = {
-        id: Date.now(),
-        name: document.getElementById('testimonial-name').value,
-        role: document.getElementById('testimonial-role').value,
-        quote: quote,
-        tags: document.getElementById('testimonial-tags').value,
-        date: new Date().toISOString()
-    };
-    
-    const testimonials = JSON.parse(localStorage.getItem('admin-testimonials') || '[]');
-    testimonials.push(testimonial);
-    localStorage.setItem('admin-testimonials', JSON.stringify(testimonials));
-    
-    showAlert('testimonial-alert', '✅ Testimonial added successfully! It will appear on the Impact page. <a href="impact.html" target="_blank" style="color: inherit; text-decoration: underline;">View Impact Page</a>', 'success');
-    document.getElementById('testimonial-form').reset();
-    
-    // Reset word counter
-    const wordCounter = document.querySelector('#testimonial-quote').parentNode.querySelector('.word-counter');
-    if (wordCounter) {
-        wordCounter.textContent = '0 / 100 words';
-        wordCounter.style.color = 'var(--text-secondary)';
-        wordCounter.classList.remove('over-limit');
-    }
-    
-    loadTestimonials();
-    
-    // Trigger custom event for same-tab updates
-    window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'testimonials' } }));
-});
+    try {
+        if (!window.supabase) {
+            showAlert('testimonial-alert', '❌ Database connection not available. Please refresh the page.', 'error');
+            return;
+        }
 
-function deleteTestimonial(index) {
-    if (confirm('Are you sure you want to delete this testimonial?')) {
-        const testimonials = JSON.parse(localStorage.getItem('admin-testimonials') || '[]');
-        testimonials.splice(index, 1);
-        localStorage.setItem('admin-testimonials', JSON.stringify(testimonials));
-        loadTestimonials();
-    }
-}
-
-function editTestimonial(index) {
-    const testimonials = JSON.parse(localStorage.getItem('admin-testimonials') || '[]');
-    const testimonial = testimonials[index];
-    
-    document.getElementById('testimonial-name').value = testimonial.name;
-    document.getElementById('testimonial-role').value = testimonial.role;
-    document.getElementById('testimonial-quote').value = testimonial.quote;
-    document.getElementById('testimonial-tags').value = testimonial.tags || '';
-    
-    // Scroll to form
-    document.getElementById('testimonial-form').scrollIntoView({ behavior: 'smooth' });
-    
-    // Update form to edit mode
-    const form = document.getElementById('testimonial-form');
-    form.dataset.editIndex = index;
-    form.querySelector('button[type="submit"]').innerHTML = '<i class="fas fa-save"></i> Update Testimonial';
-    
-    // Update submit handler
-    form.onsubmit = (e) => {
-        e.preventDefault();
-        
         const quote = document.getElementById('testimonial-quote').value;
         const wordCount = countWords(quote);
         
@@ -272,19 +220,45 @@ function editTestimonial(index) {
             return;
         }
         
-        testimonial.name = document.getElementById('testimonial-name').value;
-        testimonial.role = document.getElementById('testimonial-role').value;
-        testimonial.quote = quote;
-        testimonial.tags = document.getElementById('testimonial-tags').value;
+        const form = document.getElementById('testimonial-form');
+        const editingId = form.getAttribute('data-editing-id');
         
-        testimonials[index] = testimonial;
-        localStorage.setItem('admin-testimonials', JSON.stringify(testimonials));
+        const testimonialData = {
+            name: document.getElementById('testimonial-name').value,
+            role: document.getElementById('testimonial-role').value || null,
+            quote: quote,
+            tags: document.getElementById('testimonial-tags').value || null
+        };
         
-        showAlert('testimonial-alert', '✅ Testimonial updated successfully!', 'success');
+        if (editingId) {
+            // Update existing testimonial
+            const { error } = await window.supabase
+                .from('testimonials')
+                .update(testimonialData)
+                .eq('id', editingId);
+            
+            if (error) throw error;
+            
+            showAlert('testimonial-alert', '✅ Testimonial updated successfully!', 'success');
+            form.removeAttribute('data-editing-id');
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn.getAttribute('data-original-html')) {
+                const originalHTML = submitBtn.getAttribute('data-original-html');
+                submitBtn.innerHTML = originalHTML;
+                submitBtn.removeAttribute('data-original-html');
+            }
+        } else {
+            // Insert new testimonial
+            const { error } = await window.supabase
+                .from('testimonials')
+                .insert([testimonialData]);
+            
+            if (error) throw error;
+            
+            showAlert('testimonial-alert', '✅ Testimonial added successfully! It will appear on the Impact page. <a href="impact.html" target="_blank" style="color: inherit; text-decoration: underline;">View Impact Page</a>', 'success');
+        }
+        
         form.reset();
-        delete form.dataset.editIndex;
-        form.querySelector('button[type="submit"]').innerHTML = '<i class="fas fa-save"></i> Save Testimonial';
-        form.onsubmit = arguments.callee;
         
         // Reset word counter
         const wordCounter = document.querySelector('#testimonial-quote').parentNode.querySelector('.word-counter');
@@ -294,8 +268,95 @@ function editTestimonial(index) {
             wordCounter.classList.remove('over-limit');
         }
         
-        loadTestimonials();
-    };
+        await loadTestimonials();
+        
+        // Trigger custom event for same-tab updates
+        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'testimonials' } }));
+        
+    } catch (error) {
+        console.error('Error saving testimonial:', error);
+        showAlert('testimonial-alert', `❌ Error saving testimonial: ${error.message || 'Please try again.'}`, 'error');
+    }
+});
+
+async function deleteTestimonial(testimonialId) {
+    try {
+        if (!window.supabase) {
+            showAlert('testimonial-alert', '❌ Database connection not available. Please refresh the page.', 'error');
+            return;
+        }
+
+        // First, get the testimonial to show its name in confirmation
+        const { data: testimonialData, error: fetchError } = await window.supabase
+            .from('testimonials')
+            .select('name')
+            .eq('id', testimonialId)
+            .single();
+        
+        if (fetchError || !testimonialData) {
+            showAlert('testimonial-alert', '❌ Testimonial not found.', 'error');
+            return;
+        }
+        
+        if (confirm(`Are you sure you want to delete the testimonial from "${testimonialData.name || 'this person'}"? This action cannot be undone.`)) {
+            const { error } = await window.supabase
+                .from('testimonials')
+                .delete()
+                .eq('id', testimonialId);
+            
+            if (error) throw error;
+            
+            await loadTestimonials();
+            showAlert('testimonial-alert', '✅ Testimonial deleted successfully.', 'success');
+            window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'testimonials' } }));
+        }
+    } catch (error) {
+        console.error('Error deleting testimonial:', error);
+        showAlert('testimonial-alert', `❌ Error deleting testimonial: ${error.message || 'Please try again.'}`, 'error');
+    }
+}
+
+async function editTestimonial(testimonialId) {
+    try {
+        if (!window.supabase) {
+            showAlert('testimonial-alert', '❌ Database connection not available. Please refresh the page.', 'error');
+            return;
+        }
+
+        const { data: testimonial, error } = await window.supabase
+            .from('testimonials')
+            .select('*')
+            .eq('id', testimonialId)
+            .single();
+        
+        if (error || !testimonial) {
+            showAlert('testimonial-alert', '❌ Testimonial not found.', 'error');
+            return;
+        }
+        
+        document.getElementById('testimonial-name').value = testimonial.name || '';
+        document.getElementById('testimonial-role').value = testimonial.role || '';
+        document.getElementById('testimonial-quote').value = testimonial.quote || '';
+        document.getElementById('testimonial-tags').value = testimonial.tags || '';
+        
+        // Store the ID being edited
+        const form = document.getElementById('testimonial-form');
+        form.setAttribute('data-editing-id', testimonialId);
+        
+        // Change submit button text
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalHTML = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-save"></i> Update Testimonial';
+        submitBtn.setAttribute('data-original-html', originalHTML);
+        
+        // Scroll to form
+        form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        
+        showAlert('testimonial-alert', '📝 Editing testimonial. Update the fields and click "Update Testimonial" to save changes.', 'info');
+    } catch (error) {
+        console.error('Error editing testimonial:', error);
+        showAlert('testimonial-alert', `❌ Error loading testimonial for editing: ${error.message || 'Please try again.'}`, 'error');
+    }
 }
 
 // Photos Management
@@ -746,84 +807,206 @@ async function deletePhoto(photoId) {
 }
 
 // Videos Management
-function loadVideos(searchTerm = '') {
-    const videos = JSON.parse(localStorage.getItem('admin-videos') || '[]');
-    const list = document.getElementById('videos-list');
-    
-    // Filter videos if search term provided
-    let filteredVideos = videos;
-    if (searchTerm.trim()) {
-        const searchLower = searchTerm.toLowerCase();
-        filteredVideos = videos.filter(video => 
-            (video.title && video.title.toLowerCase().includes(searchLower)) ||
-            (video.description && video.description.toLowerCase().includes(searchLower)) ||
-            (video.url && video.url.toLowerCase().includes(searchLower))
-        );
-    }
-    
-    if (filteredVideos.length === 0) {
-        list.innerHTML = searchTerm.trim()
-            ? `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No videos found matching "${searchTerm}"</p>`
-            : '<p>No videos added yet. Add one above!</p>';
-        return;
-    }
-    
-    list.innerHTML = filteredVideos.map((video, displayIndex) => {
-        // Find original index for edit/delete functions
-        const originalIndex = videos.findIndex(v => v.id === video.id);
-        return `
-        <div class="item-card">
-            <div class="item-card-content">
-                <h3>${video.title}</h3>
-                ${video.description ? `<p>${video.description}</p>` : ''}
-                <p><strong>URL:</strong> <a href="${video.url}" target="_blank">${video.url}</a></p>
+async function loadVideos(searchTerm = '') {
+    try {
+        if (!window.supabase) {
+            const list = document.getElementById('videos-list');
+            list.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Database connection not available. Please refresh the page.</p>';
+            return;
+        }
+
+        const { data: videos, error } = await window.supabase
+            .from('videos')
+            .select('*')
+            .order('date', { ascending: false });
+        
+        if (error) throw error;
+        
+        const list = document.getElementById('videos-list');
+        
+        // Filter videos if search term provided
+        let filteredVideos = videos || [];
+        if (searchTerm.trim()) {
+            const searchLower = searchTerm.toLowerCase();
+            filteredVideos = filteredVideos.filter(video => 
+                (video.title && video.title.toLowerCase().includes(searchLower)) ||
+                (video.description && video.description.toLowerCase().includes(searchLower)) ||
+                (video.url && video.url.toLowerCase().includes(searchLower))
+            );
+        }
+        
+        if (filteredVideos.length === 0) {
+            list.innerHTML = searchTerm.trim()
+                ? `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No videos found matching "${searchTerm}"</p>`
+                : '<p>No videos added yet. Add one above!</p>';
+            return;
+        }
+        
+        list.innerHTML = filteredVideos.map((video) => {
+            return `
+            <div class="item-card">
+                <div class="item-card-content">
+                    <h3>${video.title}</h3>
+                    ${video.description ? `<p>${video.description}</p>` : ''}
+                    <p><strong>URL:</strong> <a href="${video.url}" target="_blank">${video.url}</a></p>
+                    ${video.thumbnail ? `<p><strong>Thumbnail:</strong> <a href="${video.thumbnail}" target="_blank">${video.thumbnail}</a></p>` : ''}
+                </div>
+                <div class="item-card-actions">
+                    <button class="btn btn-info" onclick="editVideo(${video.id})">
+                        <i class="fas fa-edit"></i> Edit
+                    </button>
+                    <button class="btn btn-danger" onclick="deleteVideo(${video.id})">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </div>
             </div>
-            <div class="item-card-actions">
-                <button class="btn btn-danger" onclick="deleteVideo(${originalIndex})">
-                    <i class="fas fa-trash"></i> Delete
-                </button>
-            </div>
-        </div>
-    `;
-    }).join('');
+        `;
+        }).join('');
+    } catch (error) {
+        console.error('Error loading videos:', error);
+        const list = document.getElementById('videos-list');
+        list.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Error loading videos. Please try again.</p>';
+    }
 }
 
-document.getElementById('video-form').addEventListener('submit', (e) => {
+document.getElementById('video-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     
-    const video = {
-        id: Date.now(),
-        title: document.getElementById('video-title').value,
-        description: document.getElementById('video-description').value,
-        url: document.getElementById('video-url').value,
-        thumbnail: document.getElementById('video-thumbnail').value,
-        date: new Date().toISOString()
-    };
-    
-    const videos = JSON.parse(localStorage.getItem('admin-videos') || '[]');
-    videos.push(video);
-    localStorage.setItem('admin-videos', JSON.stringify(videos));
-    
-    showAlert('video-alert', '✅ Video added successfully! It will appear on the Video Gallery page. <a href="video.html" target="_blank" style="color: inherit; text-decoration: underline;">View Videos</a>', 'success');
-    document.getElementById('video-form').reset();
-    loadVideos();
-    
-    // Trigger real-time update event
-    window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'videos' } }));
-    
-    // Trigger custom event for same-tab updates
-    window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'videos' } }));
+    try {
+        if (!window.supabase) {
+            showAlert('video-alert', '❌ Database connection not available. Please refresh the page.', 'error');
+            return;
+        }
+
+        const form = document.getElementById('video-form');
+        const editingId = form.getAttribute('data-editing-id');
+        
+        const videoData = {
+            title: document.getElementById('video-title').value,
+            description: document.getElementById('video-description').value,
+            url: document.getElementById('video-url').value,
+            thumbnail: document.getElementById('video-thumbnail').value || null,
+            date: new Date().toISOString()
+        };
+        
+        if (editingId) {
+            // Update existing video
+            const { error } = await window.supabase
+                .from('videos')
+                .update(videoData)
+                .eq('id', editingId);
+            
+            if (error) throw error;
+            
+            showAlert('video-alert', '✅ Video updated successfully!', 'success');
+            form.removeAttribute('data-editing-id');
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn.getAttribute('data-original-html')) {
+                const originalHTML = submitBtn.getAttribute('data-original-html');
+                submitBtn.innerHTML = originalHTML;
+                submitBtn.removeAttribute('data-original-html');
+            }
+        } else {
+            // Insert new video
+            const { error } = await window.supabase
+                .from('videos')
+                .insert([videoData]);
+            
+            if (error) throw error;
+            
+            showAlert('video-alert', '✅ Video added successfully! It will appear on the Video Gallery page. <a href="video.html" target="_blank" style="color: inherit; text-decoration: underline;">View Videos</a>', 'success');
+        }
+        
+        form.reset();
+        await loadVideos();
+        
+        // Trigger custom event for real-time updates
+        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'videos' } }));
+        
+    } catch (error) {
+        console.error('Error saving video:', error);
+        showAlert('video-alert', `❌ Error saving video: ${error.message || 'Please try again.'}`, 'error');
+    }
 });
 
-function deleteVideo(index) {
-    if (confirm('Are you sure you want to delete this video?')) {
-        const videos = JSON.parse(localStorage.getItem('admin-videos') || '[]');
-        videos.splice(index, 1);
-        localStorage.setItem('admin-videos', JSON.stringify(videos));
-        loadVideos();
+async function deleteVideo(videoId) {
+    try {
+        if (!window.supabase) {
+            showAlert('video-alert', '❌ Database connection not available. Please refresh the page.', 'error');
+            return;
+        }
+
+        // First, get the video to show its title in confirmation
+        const { data: videoData, error: fetchError } = await window.supabase
+            .from('videos')
+            .select('title')
+            .eq('id', videoId)
+            .single();
         
-        // Trigger real-time update event
-        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'videos' } }));
+        if (fetchError || !videoData) {
+            showAlert('video-alert', '❌ Video not found.', 'error');
+            return;
+        }
+        
+        if (confirm(`Are you sure you want to delete "${videoData.title || 'this video'}"? This action cannot be undone.`)) {
+            const { error } = await window.supabase
+                .from('videos')
+                .delete()
+                .eq('id', videoId);
+            
+            if (error) throw error;
+            
+            await loadVideos();
+            showAlert('video-alert', '✅ Video deleted successfully.', 'success');
+            window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'videos' } }));
+        }
+    } catch (error) {
+        console.error('Error deleting video:', error);
+        showAlert('video-alert', `❌ Error deleting video: ${error.message || 'Please try again.'}`, 'error');
+    }
+}
+
+async function editVideo(videoId) {
+    try {
+        if (!window.supabase) {
+            showAlert('video-alert', '❌ Database connection not available. Please refresh the page.', 'error');
+            return;
+        }
+
+        const { data: video, error } = await window.supabase
+            .from('videos')
+            .select('*')
+            .eq('id', videoId)
+            .single();
+        
+        if (error || !video) {
+            showAlert('video-alert', '❌ Video not found.', 'error');
+            return;
+        }
+        
+        // Populate form with video data
+        document.getElementById('video-title').value = video.title || '';
+        document.getElementById('video-description').value = video.description || '';
+        document.getElementById('video-url').value = video.url || '';
+        document.getElementById('video-thumbnail').value = video.thumbnail || '';
+        
+        // Store the ID being edited
+        const form = document.getElementById('video-form');
+        form.setAttribute('data-editing-id', videoId);
+    
+        // Change submit button text
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalHTML = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-save"></i> Update Video';
+        submitBtn.setAttribute('data-original-html', originalHTML);
+    
+        // Scroll to form
+        form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    
+        showAlert('video-alert', '📝 Editing video. Update the fields and click "Update Video" to save changes.', 'info');
+    } catch (error) {
+        console.error('Error editing video:', error);
+        showAlert('video-alert', `❌ Error loading video for editing: ${error.message || 'Please try again.'}`, 'error');
     }
 }
 
@@ -1034,62 +1217,77 @@ function deletePendingStory(index) {
 }
 
 // Events Management
-function loadEvents(searchTerm = '') {
-    const events = JSON.parse(localStorage.getItem('admin-events') || '[]');
-    const list = document.getElementById('events-list');
-    
-    // Filter events if search term provided
-    let filteredEvents = events;
-    if (searchTerm.trim()) {
-        const searchLower = searchTerm.toLowerCase();
-        filteredEvents = events.filter(event => 
-            (event.title && event.title.toLowerCase().includes(searchLower)) ||
-            (event.description && event.description.toLowerCase().includes(searchLower)) ||
-            (event.location && event.location.toLowerCase().includes(searchLower)) ||
-            (event.venue && event.venue.toLowerCase().includes(searchLower))
-        );
-    }
-    
-    if (filteredEvents.length === 0) {
-        list.innerHTML = searchTerm.trim()
-            ? `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No events found matching "${searchTerm}"</p>`
-            : '<p>No events created yet. Create one above!</p>';
-        return;
-    }
-    
-    // Sort by date
-    filteredEvents.sort((a, b) => new Date(a.date) - new Date(b.date));
-    
-    list.innerHTML = filteredEvents.map((event, displayIndex) => {
-        // Find original index for edit/delete functions
-        const originalIndex = events.findIndex(e => e.id === event.id);
-        return `
-        <div class="item-card">
-            <div class="item-card-content">
-                <h3>${event.title}</h3>
-                <p><strong>Date:</strong> ${new Date(event.date).toLocaleDateString()} ${event.time ? `at ${event.time}` : ''}</p>
-                <p><strong>Location:</strong> ${event.location}</p>
-                ${event.venue ? `<p><strong>Venue:</strong> ${event.venue}</p>` : ''}
-                <p>${event.description}</p>
-                ${event.contactName ? `<p><strong>Contact:</strong> ${event.contactName} ${event.contactEmail ? `(${event.contactEmail})` : ''} ${event.contactPhone ? `- ${event.contactPhone}` : ''}</p>` : ''}
-                ${event.featured ? '<span style="background: #f59e0b; color: white; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">Featured on Homepage</span>' : ''}
-            </div>
-            <div class="item-card-actions">
-                ${new Date(event.date) >= new Date() ? `
-                    <button class="btn btn-info" onclick="viewEventRegistrants('${event.id}')" title="View Registrants">
-                        <i class="fas fa-users"></i> View Registrants
+async function loadEvents(searchTerm = '') {
+    try {
+        if (!window.supabase) {
+            const list = document.getElementById('events-list');
+            list.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Database connection not available. Please refresh the page.</p>';
+            return;
+        }
+
+        const { data: events, error } = await window.supabase
+            .from('events')
+            .select('*')
+            .order('date', { ascending: true });
+        
+        if (error) throw error;
+        
+        const list = document.getElementById('events-list');
+        
+        // Filter events if search term provided
+        let filteredEvents = events || [];
+        if (searchTerm.trim()) {
+            const searchLower = searchTerm.toLowerCase();
+            filteredEvents = filteredEvents.filter(event => 
+                (event.title && event.title.toLowerCase().includes(searchLower)) ||
+                (event.description && event.description.toLowerCase().includes(searchLower)) ||
+                (event.location && event.location.toLowerCase().includes(searchLower)) ||
+                (event.venue && event.venue.toLowerCase().includes(searchLower))
+            );
+        }
+        
+        if (filteredEvents.length === 0) {
+            list.innerHTML = searchTerm.trim()
+                ? `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No events found matching "${searchTerm}"</p>`
+                : '<p>No events created yet. Create one above!</p>';
+            return;
+        }
+        
+        list.innerHTML = filteredEvents.map((event) => {
+            const eventDate = new Date(event.date);
+            const isUpcoming = eventDate >= new Date();
+            return `
+            <div class="item-card">
+                <div class="item-card-content">
+                    <h3>${event.title}</h3>
+                    <p><strong>Date:</strong> ${eventDate.toLocaleDateString()} ${event.time ? `at ${event.time}` : ''}</p>
+                    <p><strong>Location:</strong> ${event.location || 'N/A'}</p>
+                    ${event.venue ? `<p><strong>Venue:</strong> ${event.venue}</p>` : ''}
+                    <p>${event.description || ''}</p>
+                    ${event.contact_name ? `<p><strong>Contact:</strong> ${event.contact_name} ${event.contact_email ? `(${event.contact_email})` : ''} ${event.contact_phone ? `- ${event.contact_phone}` : ''}</p>` : ''}
+                    ${event.featured ? '<span style="background: #f59e0b; color: white; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">Featured on Homepage</span>' : ''}
+                </div>
+                <div class="item-card-actions">
+                    ${isUpcoming ? `
+                        <button class="btn btn-info" onclick="viewEventRegistrants('${event.id}')" title="View Registrants">
+                            <i class="fas fa-users"></i> View Registrants
+                        </button>
+                    ` : ''}
+                    <button class="btn btn-secondary" onclick="editEvent(${event.id})">
+                        <i class="fas fa-edit"></i> Edit
                     </button>
-                ` : ''}
-                <button class="btn btn-secondary" onclick="editEvent(${originalIndex})">
-                    <i class="fas fa-edit"></i> Edit
-                </button>
-                <button class="btn btn-danger" onclick="deleteEvent(${originalIndex})">
-                    <i class="fas fa-trash"></i> Delete
-                </button>
+                    <button class="btn btn-danger" onclick="deleteEvent(${event.id})">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </div>
             </div>
-        </div>
-    `;
-    }).join('');
+        `;
+        }).join('');
+    } catch (error) {
+        console.error('Error loading events:', error);
+        const list = document.getElementById('events-list');
+        list.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Error loading events. Please try again.</p>';
+    }
 }
 
 // Initialize event form handlers when DOM is ready
@@ -1121,15 +1319,8 @@ function initEventFormHandlers() {
     const eventForm = document.getElementById('event-form');
     if (eventForm && !eventForm.hasAttribute('data-listener-attached')) {
         eventForm.setAttribute('data-listener-attached', 'true');
-        eventForm.addEventListener('submit', (e) => {
+        eventForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            
-            // Check if we're in edit mode
-            const submitBtn = document.querySelector('#event-form button[type="submit"]');
-            if (submitBtn && submitBtn.onclick) {
-                // In edit mode, let the onclick handler handle it
-                return;
-            }
             
             const imageFile = document.getElementById('event-image-file');
             const imageFileValue = imageFile ? imageFile.files[0] : null;
@@ -1138,13 +1329,13 @@ function initEventFormHandlers() {
             // Handle local file upload
             if (imageFileValue && !imageUrl) {
                 const reader = new FileReader();
-                reader.onload = (e) => {
+                reader.onload = async (e) => {
                     imageUrl = e.target.result;
-                    saveEvent(imageUrl);
+                    await saveEvent(imageUrl);
                 };
                 reader.readAsDataURL(imageFileValue);
             } else {
-                saveEvent(imageUrl);
+                await saveEvent(imageUrl);
             }
         });
     }
@@ -1168,262 +1359,209 @@ loadTabContent = function(tab) {
     }
 };
 
-function saveEvent(imageUrl) {
-    const maxAttendees = parseInt(document.getElementById('event-max-attendees').value) || 0;
-    const maxOrgAttendees = document.getElementById('event-max-org-attendees').value 
-        ? parseInt(document.getElementById('event-max-org-attendees').value) 
-        : null;
-    
-    // Handle document uploads
-    const documentFiles = document.getElementById('event-documents').files;
-    const documents = [];
-    
-    if (documentFiles.length > 0) {
-        const filePromises = Array.from(documentFiles).map(file => {
-            return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    resolve({
-                        name: file.name,
-                        filename: file.name,
-                        data: e.target.result,
-                        url: e.target.result, // For data URLs
-                        size: file.size,
-                        type: file.type
-                    });
-                };
-                reader.readAsDataURL(file);
-            });
-        });
+async function saveEvent(imageUrl) {
+    try {
+        if (!window.supabase) {
+            showAlert('event-alert', '❌ Database connection not available. Please refresh the page.', 'error');
+            return;
+        }
+
+        const maxAttendees = parseInt(document.getElementById('event-max-attendees').value) || 0;
+        const maxOrgAttendees = document.getElementById('event-max-org-attendees').value 
+            ? parseInt(document.getElementById('event-max-org-attendees').value) 
+            : null;
         
-        Promise.all(filePromises).then(docs => {
-            const event = {
-                id: Date.now(),
-                title: document.getElementById('event-title').value,
-                date: document.getElementById('event-date').value,
-                time: document.getElementById('event-time').value,
-                location: document.getElementById('event-location').value,
-                description: document.getElementById('event-description').value,
-                venue: document.getElementById('event-venue').value,
-                contactName: document.getElementById('event-contact-name').value,
-                contactEmail: document.getElementById('event-contact-email').value,
-                contactPhone: document.getElementById('event-contact-phone').value,
-                image: imageUrl,
-                registrationLink: document.getElementById('event-registration-link').value,
-                featured: document.getElementById('event-featured').checked,
-                maxAttendees: maxAttendees,
-                maxAttendeesPerOrganization: maxOrgAttendees,
-                documents: docs,
-                createdAt: new Date().toISOString()
-            };
+        // Handle document uploads
+        const documentFiles = document.getElementById('event-documents').files;
+        const documents = [];
+        
+        if (documentFiles.length > 0) {
+            const filePromises = Array.from(documentFiles).map(file => {
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        resolve({
+                            name: file.name,
+                            filename: file.name,
+                            data: e.target.result,
+                            url: e.target.result, // For data URLs
+                            size: file.size,
+                            type: file.type
+                        });
+                    };
+                    reader.readAsDataURL(file);
+                });
+            });
             
-            const events = JSON.parse(localStorage.getItem('admin-events') || '[]');
-            events.push(event);
-            localStorage.setItem('admin-events', JSON.stringify(events));
-            
-            showAlert('event-alert', '✅ Event created successfully!', 'success');
-            document.getElementById('event-form').reset();
-            document.getElementById('event-documents-preview').innerHTML = '';
-            loadEvents();
-            window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'events' } }));
-        });
-    } else {
-        const event = {
-            id: Date.now(),
+            const docs = await Promise.all(filePromises);
+            documents.push(...docs);
+        }
+        
+        const form = document.getElementById('event-form');
+        const editingId = form.getAttribute('data-editing-id');
+        
+        const eventData = {
             title: document.getElementById('event-title').value,
             date: document.getElementById('event-date').value,
-            time: document.getElementById('event-time').value,
-            location: document.getElementById('event-location').value,
-            description: document.getElementById('event-description').value,
-            venue: document.getElementById('event-venue').value,
-            contactName: document.getElementById('event-contact-name').value,
-            contactEmail: document.getElementById('event-contact-email').value,
-            contactPhone: document.getElementById('event-contact-phone').value,
-            image: imageUrl,
-            registrationLink: document.getElementById('event-registration-link').value,
+            time: document.getElementById('event-time').value || null,
+            location: document.getElementById('event-location').value || null,
+            description: document.getElementById('event-description').value || null,
+            venue: document.getElementById('event-venue').value || null,
+            contact_name: document.getElementById('event-contact-name').value || null,
+            contact_email: document.getElementById('event-contact-email').value || null,
+            contact_phone: document.getElementById('event-contact-phone').value || null,
+            image: imageUrl || null,
+            registration_link: document.getElementById('event-registration-link').value || null,
             featured: document.getElementById('event-featured').checked,
-            maxAttendees: maxAttendees,
-            maxAttendeesPerOrganization: maxOrgAttendees,
-            documents: [],
-            createdAt: new Date().toISOString()
+            max_attendees: maxAttendees,
+            max_attendees_per_organization: maxOrgAttendees,
+            documents: documents.length > 0 ? documents : []
         };
         
-        const events = JSON.parse(localStorage.getItem('admin-events') || '[]');
-        events.push(event);
-        localStorage.setItem('admin-events', JSON.stringify(events));
-        
-        showAlert('event-alert', '✅ Event created successfully!', 'success');
-        document.getElementById('event-form').reset();
-        document.getElementById('event-documents-preview').innerHTML = '';
-        loadEvents();
-        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'events' } }));
-    }
-}
-
-function editEvent(index) {
-    const events = JSON.parse(localStorage.getItem('admin-events') || '[]');
-    const event = events[index];
-    
-    if (!event) return;
-    
-    // Populate form
-    document.getElementById('event-title').value = event.title || '';
-    document.getElementById('event-date').value = event.date || '';
-    document.getElementById('event-time').value = event.time || '';
-    document.getElementById('event-location').value = event.location || '';
-    document.getElementById('event-description').value = event.description || '';
-    document.getElementById('event-venue').value = event.venue || '';
-    document.getElementById('event-contact-name').value = event.contactName || '';
-    document.getElementById('event-contact-email').value = event.contactEmail || '';
-    document.getElementById('event-contact-phone').value = event.contactPhone || '';
-    document.getElementById('event-image').value = event.image || '';
-    document.getElementById('event-registration-link').value = event.registrationLink || '';
-    document.getElementById('event-featured').checked = event.featured || false;
-    document.getElementById('event-max-attendees').value = event.maxAttendees || '';
-    document.getElementById('event-max-org-attendees').value = event.maxAttendeesPerOrganization || '';
-    
-    // Display existing documents
-    const previewDiv = document.getElementById('event-documents-preview');
-    if (event.documents && event.documents.length > 0) {
-        previewDiv.innerHTML = `
-            <div style="margin-top: 0.5rem; padding: 0.75rem; background: var(--light-gray); border-radius: 6px;">
-                <strong>Existing Documents (${event.documents.length}):</strong>
-                <ul style="margin: 0.5rem 0 0 0; padding-left: 1.5rem;">
-                    ${event.documents.map(doc => `<li>${doc.name || doc.filename || 'Document'}</li>`).join('')}
-                </ul>
-                <small style="color: var(--text-secondary);">Upload new files to add to existing documents</small>
-            </div>
-        `;
-    } else {
-        previewDiv.innerHTML = '';
-    }
-    
-    // Change submit button text
-    const submitBtn = document.querySelector('#event-form button[type="submit"]');
-    if (submitBtn) {
-        submitBtn.innerHTML = '<i class="fas fa-save"></i> Update Event';
-        submitBtn.onclick = (e) => {
-            e.preventDefault();
-            updateEvent(index);
-        };
-    }
-    
-    // Scroll to form
-    document.getElementById('event-form').scrollIntoView({ behavior: 'smooth' });
-}
-
-function updateEvent(index) {
-    const imageFile = document.getElementById('event-image-file').files[0];
-    let imageUrl = document.getElementById('event-image').value;
-    
-    // Handle local file upload
-    if (imageFile && !imageUrl) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            imageUrl = e.target.result;
-            saveUpdatedEvent(index, imageUrl);
-        };
-        reader.readAsDataURL(imageFile);
-    } else {
-        saveUpdatedEvent(index, imageUrl);
-    }
-}
-
-function saveUpdatedEvent(index, imageUrl) {
-    const maxAttendees = parseInt(document.getElementById('event-max-attendees').value) || 0;
-    const maxOrgAttendees = document.getElementById('event-max-org-attendees').value 
-        ? parseInt(document.getElementById('event-max-org-attendees').value) 
-        : null;
-    
-    const events = JSON.parse(localStorage.getItem('admin-events') || '[]');
-    const event = events[index];
-    
-    event.title = document.getElementById('event-title').value;
-    event.date = document.getElementById('event-date').value;
-    event.time = document.getElementById('event-time').value;
-    event.location = document.getElementById('event-location').value;
-    event.description = document.getElementById('event-description').value;
-    event.venue = document.getElementById('event-venue').value;
-    event.contactName = document.getElementById('event-contact-name').value;
-    event.contactEmail = document.getElementById('event-contact-email').value;
-    event.contactPhone = document.getElementById('event-contact-phone').value;
-    if (imageUrl) event.image = imageUrl;
-    event.registrationLink = document.getElementById('event-registration-link').value;
-    event.featured = document.getElementById('event-featured').checked;
-    event.maxAttendees = maxAttendees;
-    event.maxAttendeesPerOrganization = maxOrgAttendees;
-    
-    // Handle document uploads - preserve existing documents if no new ones uploaded
-    const documentFiles = document.getElementById('event-documents').files;
-    if (documentFiles.length > 0) {
-        const filePromises = Array.from(documentFiles).map(file => {
-            return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    resolve({
-                        name: file.name,
-                        filename: file.name,
-                        data: e.target.result,
-                        url: e.target.result,
-                        size: file.size,
-                        type: file.type
-                    });
-                };
-                reader.readAsDataURL(file);
-            });
-        });
-        
-        Promise.all(filePromises).then(docs => {
-            // Merge with existing documents (if any)
-            event.documents = (event.documents || []).concat(docs);
-            event.updatedAt = new Date().toISOString();
+        if (editingId) {
+            // Update existing event
+            const { error } = await window.supabase
+                .from('events')
+                .update(eventData)
+                .eq('id', editingId);
             
-            localStorage.setItem('admin-events', JSON.stringify(events));
+            if (error) throw error;
             
             showAlert('event-alert', '✅ Event updated successfully!', 'success');
-            document.getElementById('event-form').reset();
-            document.getElementById('event-documents-preview').innerHTML = '';
-            
-            // Reset submit button
-            const submitBtn = document.querySelector('#event-form button[type="submit"]');
+            form.removeAttribute('data-editing-id');
+            const submitBtn = form.querySelector('button[type="submit"]');
             if (submitBtn) {
                 submitBtn.innerHTML = '<i class="fas fa-calendar-plus"></i> Create Event';
                 submitBtn.onclick = null;
             }
+        } else {
+            // Insert new event
+            const { error } = await window.supabase
+                .from('events')
+                .insert([eventData]);
             
-            loadEvents();
-            window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'events' } }));
-        });
-    } else {
-        // Keep existing documents if no new ones uploaded
-        if (!event.documents) event.documents = [];
-        event.updatedAt = new Date().toISOString();
-        
-        localStorage.setItem('admin-events', JSON.stringify(events));
-        
-        showAlert('event-alert', '✅ Event updated successfully!', 'success');
-        document.getElementById('event-form').reset();
-        document.getElementById('event-documents-preview').innerHTML = '';
-        
-        // Reset submit button
-        const submitBtn = document.querySelector('#event-form button[type="submit"]');
-        if (submitBtn) {
-            submitBtn.innerHTML = '<i class="fas fa-calendar-plus"></i> Create Event';
-            submitBtn.onclick = null;
+            if (error) throw error;
+            
+            showAlert('event-alert', '✅ Event created successfully!', 'success');
         }
         
-        loadEvents();
+        document.getElementById('event-form').reset();
+        document.getElementById('event-documents-preview').innerHTML = '';
+        await loadEvents();
         window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'events' } }));
+        
+    } catch (error) {
+        console.error('Error saving event:', error);
+        showAlert('event-alert', `❌ Error saving event: ${error.message || 'Please try again.'}`, 'error');
     }
 }
 
-function deleteEvent(index) {
-    if (confirm('Are you sure you want to delete this event?')) {
-        const events = JSON.parse(localStorage.getItem('admin-events') || '[]');
-        events.splice(index, 1);
-        localStorage.setItem('admin-events', JSON.stringify(events));
-        loadEvents();
-        window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'events' } }));
+async function editEvent(eventId) {
+    try {
+        if (!window.supabase) {
+            showAlert('event-alert', '❌ Database connection not available. Please refresh the page.', 'error');
+            return;
+        }
+
+        const { data: event, error } = await window.supabase
+            .from('events')
+            .select('*')
+            .eq('id', eventId)
+            .single();
+        
+        if (error || !event) {
+            showAlert('event-alert', '❌ Event not found.', 'error');
+            return;
+        }
+        
+        // Populate form
+        document.getElementById('event-title').value = event.title || '';
+        document.getElementById('event-date').value = event.date || '';
+        document.getElementById('event-time').value = event.time || '';
+        document.getElementById('event-location').value = event.location || '';
+        document.getElementById('event-description').value = event.description || '';
+        document.getElementById('event-venue').value = event.venue || '';
+        document.getElementById('event-contact-name').value = event.contact_name || '';
+        document.getElementById('event-contact-email').value = event.contact_email || '';
+        document.getElementById('event-contact-phone').value = event.contact_phone || '';
+        document.getElementById('event-image').value = event.image || '';
+        document.getElementById('event-registration-link').value = event.registration_link || '';
+        document.getElementById('event-featured').checked = event.featured || false;
+        document.getElementById('event-max-attendees').value = event.max_attendees || '';
+        document.getElementById('event-max-org-attendees').value = event.max_attendees_per_organization || '';
+        
+        // Display existing documents
+        const previewDiv = document.getElementById('event-documents-preview');
+        if (event.documents && event.documents.length > 0) {
+            previewDiv.innerHTML = `
+                <div style="margin-top: 0.5rem; padding: 0.75rem; background: var(--light-gray); border-radius: 6px;">
+                    <strong>Existing Documents (${event.documents.length}):</strong>
+                    <ul style="margin: 0.5rem 0 0 0; padding-left: 1.5rem;">
+                        ${event.documents.map(doc => `<li>${doc.name || doc.filename || 'Document'}</li>`).join('')}
+                    </ul>
+                    <small style="color: var(--text-secondary);">Upload new files to add to existing documents</small>
+                </div>
+            `;
+        } else {
+            previewDiv.innerHTML = '';
+        }
+        
+        // Store the ID being edited
+        const form = document.getElementById('event-form');
+        form.setAttribute('data-editing-id', eventId);
+        
+        // Change submit button text
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalHTML = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-save"></i> Update Event';
+        submitBtn.setAttribute('data-original-html', originalHTML);
+        
+        // Scroll to form
+        form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        
+        showAlert('event-alert', '📝 Editing event. Update the fields and click "Update Event" to save changes.', 'info');
+    } catch (error) {
+        console.error('Error editing event:', error);
+        showAlert('event-alert', `❌ Error loading event for editing: ${error.message || 'Please try again.'}`, 'error');
+    }
+}
+
+// updateEvent and saveUpdatedEvent are now handled by saveEvent with editingId
+
+async function deleteEvent(eventId) {
+    try {
+        if (!window.supabase) {
+            showAlert('event-alert', '❌ Database connection not available. Please refresh the page.', 'error');
+            return;
+        }
+
+        // First, get the event to show its title in confirmation
+        const { data: eventData, error: fetchError } = await window.supabase
+            .from('events')
+            .select('title')
+            .eq('id', eventId)
+            .single();
+        
+        if (fetchError || !eventData) {
+            showAlert('event-alert', '❌ Event not found.', 'error');
+            return;
+        }
+        
+        if (confirm(`Are you sure you want to delete "${eventData.title || 'this event'}"? This action cannot be undone.`)) {
+            const { error } = await window.supabase
+                .from('events')
+                .delete()
+                .eq('id', eventId);
+            
+            if (error) throw error;
+            
+            await loadEvents();
+            showAlert('event-alert', '✅ Event deleted successfully.', 'success');
+            window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'events' } }));
+        }
+    } catch (error) {
+        console.error('Error deleting event:', error);
+        showAlert('event-alert', `❌ Error deleting event: ${error.message || 'Please try again.'}`, 'error');
     }
 }
 
@@ -2757,4 +2895,5 @@ document.addEventListener('DOMContentLoaded', () => {
 // Load initial content
 loadTabContent('testimonials');
 updatePendingCount();
+
 
