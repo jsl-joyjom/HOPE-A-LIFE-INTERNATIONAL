@@ -1094,19 +1094,70 @@
         // Show admin content if access was granted
         (function() {
             if (sessionStorage.getItem('adminAccess') === 'granted') {
-                // Wait for DOM to be ready
-                if (document.readyState === 'loading') {
-                    document.addEventListener('DOMContentLoaded', function() {
-                        const adminDiv = document.getElementById("admin");
-                        if (adminDiv) {
-                            adminDiv.style.display = "block";
-                        }
-                    });
-                } else {
+                // Show admin div immediately (before other scripts run)
+                const adminDiv = document.getElementById("admin");
+                if (adminDiv) {
+                    adminDiv.style.display = "block";
+                    adminDiv.style.visibility = "visible";
+                    adminDiv.style.opacity = "1";
+                }
+                
+                // Wait for DOM to be ready, then ensure it's visible
+                function ensureAdminVisible() {
                     const adminDiv = document.getElementById("admin");
                     if (adminDiv) {
                         adminDiv.style.display = "block";
+                        adminDiv.style.visibility = "visible";
+                        adminDiv.style.opacity = "1";
+                        
+                        // Re-initialize tab switching after admin is visible
+                        setTimeout(() => {
+                            if (typeof loadTabContent === 'function') {
+                                // Re-attach tab event listeners
+                                document.querySelectorAll('.admin-tab').forEach(tab => {
+                                    // Remove existing listeners by cloning
+                                    const newTab = tab.cloneNode(true);
+                                    tab.parentNode.replaceChild(newTab, tab);
+                                    
+                                    // Re-attach listener
+                                    newTab.addEventListener('click', () => {
+                                        const targetTab = newTab.getAttribute('data-tab');
+                                        
+                                        // Update active tab
+                                        document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+                                        newTab.classList.add('active');
+                                        
+                                        // Update active content
+                                        document.querySelectorAll('.admin-content').forEach(c => c.classList.remove('active'));
+                                        const targetContent = document.getElementById(`${targetTab}-tab`);
+                                        if (targetContent) {
+                                            targetContent.classList.add('active');
+                                        }
+                                        
+                                        // Load content for active tab
+                                        if (typeof loadTabContent === 'function') {
+                                            loadTabContent(targetTab);
+                                        }
+                                    });
+                                });
+                                
+                                // Load initial tab content
+                                const activeTab = document.querySelector('.admin-tab.active');
+                                if (activeTab) {
+                                    const initialTab = activeTab.getAttribute('data-tab');
+                                    if (initialTab && typeof loadTabContent === 'function') {
+                                        loadTabContent(initialTab);
+                                    }
+                                }
+                            }
+                        }, 100);
                     }
+                }
+                
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', ensureAdminVisible);
+                } else {
+                    ensureAdminVisible();
                 }
             } else {
                 // If no access, redirect to homepage

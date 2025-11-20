@@ -1,22 +1,63 @@
 // Admin Panel JavaScript
 
-// Tab switching
-document.querySelectorAll('.admin-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-        const targetTab = tab.getAttribute('data-tab');
+// Initialize tab switching - wait for admin div to be visible
+function initAdminTabs() {
+    const adminDiv = document.getElementById('admin');
+    if (!adminDiv || adminDiv.style.display === 'none') {
+        // Admin div not visible yet, retry
+        setTimeout(initAdminTabs, 100);
+        return;
+    }
+    
+    // Tab switching
+    document.querySelectorAll('.admin-tab').forEach(tab => {
+        // Remove any existing listeners by cloning
+        if (tab.hasAttribute('data-listener-attached')) {
+            return; // Already has listener
+        }
+        tab.setAttribute('data-listener-attached', 'true');
         
-        // Update active tab
-        document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        
-        // Update active content
-        document.querySelectorAll('.admin-content').forEach(c => c.classList.remove('active'));
-        document.getElementById(`${targetTab}-tab`).classList.add('active');
-        
-        // Load content for active tab
-        loadTabContent(targetTab);
+        tab.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const targetTab = tab.getAttribute('data-tab');
+            if (!targetTab) return;
+            
+            // Update active tab
+            document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            
+            // Update active content
+            document.querySelectorAll('.admin-content').forEach(c => c.classList.remove('active'));
+            const targetContent = document.getElementById(`${targetTab}-tab`);
+            if (targetContent) {
+                targetContent.classList.add('active');
+            }
+            
+            // Load content for active tab
+            if (typeof loadTabContent === 'function') {
+                loadTabContent(targetTab);
+            }
+        });
     });
-});
+    
+    // Load initial tab content
+    const activeTab = document.querySelector('.admin-tab.active');
+    if (activeTab) {
+        const initialTab = activeTab.getAttribute('data-tab');
+        if (initialTab && typeof loadTabContent === 'function') {
+            loadTabContent(initialTab);
+        }
+    }
+}
+
+// Start initialization
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAdminTabs);
+} else {
+    initAdminTabs();
+}
 
 // Load content based on active tab
 function loadTabContent(tab) {
