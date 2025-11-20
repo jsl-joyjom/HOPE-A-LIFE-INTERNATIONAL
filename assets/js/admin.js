@@ -1080,109 +1080,137 @@ function showAlert(containerId, message, type) {
 }
 
 // Pending Stories Management
-function loadPendingStories(searchTerm = '') {
-    console.log('Loading pending stories...');
-    const pendingStories = JSON.parse(localStorage.getItem('pending-stories') || '[]');
-    console.log('Found pending stories:', pendingStories.length, pendingStories);
-    const list = document.getElementById('pending-stories-list');
-    
-    if (!list) {
-        console.error('pending-stories-list element not found!');
-        return;
-    }
-    
-    const pendingCount = pendingStories.filter(s => s.status === 'pending').length;
-    const countElement = document.getElementById('pending-count');
-    if (countElement) {
-        countElement.textContent = pendingCount;
-    }
-    
-    // Filter stories if search term provided
-    let filteredStories = pendingStories;
-    if (searchTerm.trim()) {
-        const searchLower = searchTerm.toLowerCase();
-        filteredStories = pendingStories.filter(story => 
-            (story.name && story.name.toLowerCase().includes(searchLower)) ||
-            (story.email && story.email.toLowerCase().includes(searchLower)) ||
-            (story.storyTitle && story.storyTitle.toLowerCase().includes(searchLower)) ||
-            (story.story && story.story.toLowerCase().includes(searchLower)) ||
-            (story.location && story.location.toLowerCase().includes(searchLower))
-        );
-    }
-    
-    if (filteredStories.length === 0) {
-        list.innerHTML = searchTerm.trim()
-            ? `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No stories found matching "${searchTerm}"</p>`
-            : '<p style="text-align: center; color: var(--text-secondary);">No pending story submissions.</p>';
-        return;
-    }
-    
-    // Filter to show only pending stories first, then others
-    const sortedStories = [...filteredStories].sort((a, b) => {
-        if (a.status === 'pending' && b.status !== 'pending') return -1;
-        if (a.status !== 'pending' && b.status === 'pending') return 1;
-        return new Date(b.submittedAt) - new Date(a.submittedAt);
-    });
-    
-    if (sortedStories.length === 0) {
-        list.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">No pending story submissions.</p>';
-        return;
-    }
-    
-    list.innerHTML = sortedStories.map((story, index) => {
-        // Find original index for approve/reject functions
-        const originalIndex = pendingStories.findIndex(s => s.id === story.id);
-        return `
-        <div class="item-card" style="border-left: 4px solid ${story.status === 'pending' ? '#f59e0b' : story.status === 'approved' ? '#10b981' : '#ef4444'};">
-            <div class="item-card-content">
-                <h3>${story.storyTitle || 'Untitled Story'}</h3>
-                <p><strong>By:</strong> ${story.name} ${story.email ? `(${story.email})` : ''}</p>
-                ${story.location ? `<p><strong>Location:</strong> ${story.location}</p>` : ''}
-                <p><strong>Program:</strong> ${story.program || 'N/A'}</p>
-                <p><strong>Submitted:</strong> ${new Date(story.submittedAt).toLocaleDateString()}</p>
-                <p><strong>Status:</strong> <span style="text-transform: capitalize; color: ${story.status === 'pending' ? '#f59e0b' : story.status === 'approved' ? '#10b981' : '#ef4444'};">${story.status}</span></p>
-                <details style="margin-top: 1rem;">
-                    <summary style="cursor: pointer; color: var(--primary-blue); font-weight: 600;">View Story</summary>
-                    <div style="margin-top: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: 8px;">
-                        <p>${story.story}</p>
-                        ${story.imageUrl ? `<img src="${story.imageUrl}" alt="Story image" style="max-width: 100%; margin-top: 1rem; border-radius: 8px;">` : ''}
-                    </div>
-                </details>
-            </div>
-            <div class="item-card-actions">
-                ${story.status === 'pending' ? `
-                    <button class="btn btn-primary" onclick="approveStory(${originalIndex})">
-                        <i class="fas fa-check"></i> Approve & Post
-                    </button>
-                    <button class="btn btn-danger" onclick="rejectStory(${originalIndex})">
-                        <i class="fas fa-times"></i> Reject
-                    </button>
-                ` : ''}
-                <button class="btn btn-secondary" onclick="deletePendingStory(${originalIndex})">
-                    <i class="fas fa-trash"></i> Delete
-                </button>
-            </div>
-        </div>
-    `;
-    }).join('');
-}
-
-async function approveStory(index) {
+async function loadPendingStories(searchTerm = '') {
     try {
-        const pendingStories = JSON.parse(localStorage.getItem('pending-stories') || '[]');
-        const story = pendingStories[index];
+        console.log('Loading pending stories...');
         
         if (!window.supabase) {
+            const list = document.getElementById('pending-stories-list');
+            if (list) {
+                list.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Database connection not available. Please refresh the page.</p>';
+            }
+            return;
+        }
+
+        const { data: pendingStories, error } = await window.supabase
+            .from('pending_stories')
+            .select('*')
+            .order('submitted_at', { ascending: false });
+        
+        if (error) throw error;
+        
+        console.log('Found pending stories:', pendingStories?.length || 0, pendingStories);
+        const list = document.getElementById('pending-stories-list');
+        
+        if (!list) {
+            console.error('pending-stories-list element not found!');
+            return;
+        }
+        
+        const stories = pendingStories || [];
+        const pendingCount = stories.filter(s => s.status === 'pending').length;
+        const countElement = document.getElementById('pending-count');
+        if (countElement) {
+            countElement.textContent = pendingCount;
+        }
+        
+        // Filter stories if search term provided
+        let filteredStories = stories;
+        if (searchTerm.trim()) {
+            const searchLower = searchTerm.toLowerCase();
+            filteredStories = stories.filter(story => 
+                (story.name && story.name.toLowerCase().includes(searchLower)) ||
+                (story.quote && story.quote.toLowerCase().includes(searchLower)) ||
+                (story.tags && story.tags.toLowerCase().includes(searchLower))
+            );
+        }
+        
+        if (filteredStories.length === 0) {
+            list.innerHTML = searchTerm.trim()
+                ? `<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No stories found matching "${searchTerm}"</p>`
+                : '<p style="text-align: center; color: var(--text-secondary);">No pending story submissions.</p>';
+            return;
+        }
+        
+        // Filter to show only pending stories first, then others
+        const sortedStories = [...filteredStories].sort((a, b) => {
+            if (a.status === 'pending' && b.status !== 'pending') return -1;
+            if (a.status !== 'pending' && b.status === 'pending') return 1;
+            return new Date(b.submitted_at || 0) - new Date(a.submitted_at || 0);
+        });
+        
+        if (sortedStories.length === 0) {
+            list.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">No pending story submissions.</p>';
+            return;
+        }
+        
+            list.innerHTML = sortedStories.map((story) => {
+                const submittedDate = story.submitted_at ? new Date(story.submitted_at).toLocaleDateString() : 'Unknown';
+                return `
+                <div class="item-card" style="border-left: 4px solid ${story.status === 'pending' ? '#f59e0b' : story.status === 'approved' ? '#10b981' : '#ef4444'};">
+                    <div class="item-card-content">
+                        <h3>${story.name || 'Untitled Story'}</h3>
+                        <p><strong>By:</strong> ${story.name} ${story.role ? `(${story.role})` : ''}</p>
+                        ${story.tags ? `<p><strong>Tags:</strong> ${story.tags}</p>` : ''}
+                        <p><strong>Submitted:</strong> ${submittedDate}</p>
+                        <p><strong>Status:</strong> <span style="text-transform: capitalize; color: ${story.status === 'pending' ? '#f59e0b' : story.status === 'approved' ? '#10b981' : '#ef4444'};">${story.status}</span></p>
+                        <details style="margin-top: 1rem;">
+                            <summary style="cursor: pointer; color: var(--primary-blue); font-weight: 600;">View Story</summary>
+                            <div style="margin-top: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: 8px;">
+                                <p>${story.quote || 'No story content'}</p>
+                            </div>
+                        </details>
+                    </div>
+                    <div class="item-card-actions">
+                        ${story.status === 'pending' ? `
+                            <button class="btn btn-primary" onclick="approveStory(${story.id})">
+                                <i class="fas fa-check"></i> Approve & Post
+                            </button>
+                            <button class="btn btn-danger" onclick="rejectStory(${story.id})">
+                                <i class="fas fa-times"></i> Reject
+                            </button>
+                        ` : ''}
+                        <button class="btn btn-secondary" onclick="deletePendingStory(${story.id})">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </div>
+                </div>
+            `;
+            }).join('');
+        } catch (error) {
+            console.error('Error loading pending stories:', error);
+            const list = document.getElementById('pending-stories-list');
+            if (list) {
+                list.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Error loading pending stories. Please try again.</p>';
+            }
+        }
+    }
+
+async function approveStory(storyId) {
+    try {
+        if (!window.supabase) {
             showAlert('testimonial-alert', '❌ Database connection not available. Please refresh the page.', 'error');
+            return;
+        }
+        
+        // Get the story from Supabase
+        const { data: story, error: fetchError } = await window.supabase
+            .from('pending_stories')
+            .select('*')
+            .eq('id', storyId)
+            .single();
+        
+        if (fetchError || !story) {
+            showAlert('testimonial-alert', '❌ Story not found.', 'error');
             return;
         }
         
         // Convert to testimonial format
         const testimonialData = {
             name: story.name,
-            role: story.program || 'Community Member',
-            quote: story.story,
-            tags: story.program || 'Stories of Transformation'
+            role: story.role || 'Community Member',
+            quote: story.quote,
+            tags: story.tags || 'Stories of Transformation'
         };
         
         // Insert testimonial into Supabase
@@ -1192,14 +1220,19 @@ async function approveStory(index) {
         
         if (insertError) throw insertError;
         
-        // Update story status in localStorage (pending stories are still in localStorage)
-        story.status = 'approved';
-        story.approvedAt = new Date().toISOString();
-        pendingStories[index] = story;
-        localStorage.setItem('pending-stories', JSON.stringify(pendingStories));
+        // Update story status in Supabase
+        const { error: updateError } = await window.supabase
+            .from('pending_stories')
+            .update({ 
+                status: 'approved',
+                reviewed_at: new Date().toISOString()
+            })
+            .eq('id', storyId);
+        
+        if (updateError) throw updateError;
         
         showAlert('testimonial-alert', '✅ Story approved and posted! <a href="impact.html" target="_blank" style="color: inherit; text-decoration: underline;">View on Impact Page</a>', 'success');
-        loadPendingStories();
+        await loadPendingStories();
         await loadTestimonials(); // Reload testimonials from Supabase
         window.dispatchEvent(new CustomEvent('admin-content-updated', { detail: { type: 'testimonials' } }));
     } catch (error) {
@@ -1208,22 +1241,56 @@ async function approveStory(index) {
     }
 }
 
-function rejectStory(index) {
-    if (confirm('Are you sure you want to reject this story?')) {
-        const pendingStories = JSON.parse(localStorage.getItem('pending-stories') || '[]');
-        pendingStories[index].status = 'rejected';
-        pendingStories[index].rejectedAt = new Date().toISOString();
-        localStorage.setItem('pending-stories', JSON.stringify(pendingStories));
-        loadPendingStories();
+async function rejectStory(storyId) {
+    if (!confirm('Are you sure you want to reject this story?')) {
+        return;
+    }
+    
+    try {
+        if (!window.supabase) {
+            showAlert('testimonial-alert', '❌ Database connection not available. Please refresh the page.', 'error');
+            return;
+        }
+        
+        const { error } = await window.supabase
+            .from('pending_stories')
+            .update({ 
+                status: 'rejected',
+                reviewed_at: new Date().toISOString()
+            })
+            .eq('id', storyId);
+        
+        if (error) throw error;
+        
+        await loadPendingStories();
+    } catch (error) {
+        console.error('Error rejecting story:', error);
+        showAlert('testimonial-alert', `❌ Error rejecting story: ${error.message || 'Please try again.'}`, 'error');
     }
 }
 
-function deletePendingStory(index) {
-    if (confirm('Are you sure you want to delete this story submission?')) {
-        const pendingStories = JSON.parse(localStorage.getItem('pending-stories') || '[]');
-        pendingStories.splice(index, 1);
-        localStorage.setItem('pending-stories', JSON.stringify(pendingStories));
-        loadPendingStories();
+async function deletePendingStory(storyId) {
+    if (!confirm('Are you sure you want to delete this story submission?')) {
+        return;
+    }
+    
+    try {
+        if (!window.supabase) {
+            showAlert('testimonial-alert', '❌ Database connection not available. Please refresh the page.', 'error');
+            return;
+        }
+        
+        const { error } = await window.supabase
+            .from('pending_stories')
+            .delete()
+            .eq('id', storyId);
+        
+        if (error) throw error;
+        
+        await loadPendingStories();
+    } catch (error) {
+        console.error('Error deleting story:', error);
+        showAlert('testimonial-alert', `❌ Error deleting story: ${error.message || 'Please try again.'}`, 'error');
     }
 }
 
@@ -1579,10 +1646,7 @@ async function deleteEvent(eventId) {
 // Event Registrations Management
 async function viewEventRegistrants(eventId) {
     try {
-        const registrations = JSON.parse(localStorage.getItem('event-registrations') || '[]');
-        const eventRegistrations = registrations.filter(reg => reg.eventId.toString() === eventId.toString());
-        
-        // Get event from Supabase
+        // Get event and registrations from Supabase
         if (!window.supabase) {
             const container = document.getElementById('event-registrations-container');
             if (container) {
@@ -1591,19 +1655,37 @@ async function viewEventRegistrants(eventId) {
             return;
         }
 
-        const { data: event, error } = await window.supabase
+        const { data: event, error: eventError } = await window.supabase
             .from('events')
             .select('*')
             .eq('id', eventId)
             .single();
         
-        if (error || !event) {
+        if (eventError || !event) {
             const container = document.getElementById('event-registrations-container');
             if (container) {
                 container.innerHTML = '<p style="color: var(--error-color);">Event not found.</p>';
             }
             return;
         }
+
+        // Fetch registrations from Supabase
+        const { data: eventRegistrations, error: regError } = await window.supabase
+            .from('event_registrations')
+            .select('*')
+            .eq('event_id', eventId)
+            .order('created_at', { ascending: false });
+        
+        if (regError) {
+            console.error('Error fetching registrations:', regError);
+            const container = document.getElementById('event-registrations-container');
+            if (container) {
+                container.innerHTML = '<p style="color: var(--error-color);">Error loading registrations.</p>';
+            }
+            return;
+        }
+        
+        const registrations = eventRegistrations || [];
         
         const container = document.getElementById('event-registrations-container');
         if (!container) return;
@@ -1611,7 +1693,7 @@ async function viewEventRegistrants(eventId) {
         // Store current event ID for refresh
         container.setAttribute('data-current-event-id', eventId);
         
-        if (eventRegistrations.length === 0) {
+        if (registrations.length === 0) {
             container.innerHTML = `
                 <div style="text-align: center; padding: 2rem;">
                     <p style="color: var(--text-secondary); margin-bottom: 1rem;">No registrations yet for this event.</p>
@@ -1622,7 +1704,7 @@ async function viewEventRegistrants(eventId) {
         }
         
         // Calculate total attendees
-        const totalAttendees = eventRegistrations.reduce((sum, reg) => sum + (reg.numberOfAttendees || 1), 0);
+        const totalAttendees = registrations.reduce((sum, reg) => sum + (reg.number_of_attendees || 1), 0);
         const maxAttendees = event.max_attendees || 0;
         const remainingSlots = maxAttendees > 0 ? Math.max(0, maxAttendees - totalAttendees) : 'Unlimited';
         
@@ -1631,7 +1713,7 @@ async function viewEventRegistrants(eventId) {
             <h3 style="margin-bottom: 0.5rem;">${event.title}</h3>
             <p style="color: var(--text-secondary); margin-bottom: 1rem;">
                 Date: ${new Date(event.date).toLocaleDateString()} | 
-                Total Registrations: ${eventRegistrations.length} | 
+                Total Registrations: ${registrations.length} | 
                 Total Attendees: ${totalAttendees}${maxAttendees > 0 ? ` / ${maxAttendees} (${remainingSlots} remaining)` : ''}
             </p>
             <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
@@ -1664,19 +1746,22 @@ async function viewEventRegistrants(eventId) {
                     </tr>
                 </thead>
                 <tbody>
-                    ${eventRegistrations.map((reg, index) => {
-                        const attendeeDetails = reg.attendeeDetails || [];
+                    ${registrations.map((reg, index) => {
+                        const attendeeDetails = reg.attendee_details || [];
                         const hasDetails = attendeeDetails.length > 0;
+                        const name = reg.registration_type === 'organization' ? reg.contact_person : reg.registrant_name;
+                        const email = reg.registration_type === 'organization' ? reg.contact_email : reg.registrant_email;
+                        const phone = reg.registration_type === 'organization' ? reg.contact_phone : reg.registrant_phone;
                         return `
                         <tr style="border-bottom: 1px solid var(--border-color);">
                             <td style="padding: 0.75rem;">${index + 1}</td>
                             <td style="padding: 0.75rem;">
-                                ${reg.registrationType === 'organization' ? `<strong>${reg.organizationName || 'N/A'}</strong><br><small>Contact: ${reg.name || 'N/A'}</small>` : reg.name || 'N/A'}
+                                ${reg.registration_type === 'organization' ? `<strong>${reg.organization_name || 'N/A'}</strong><br><small>Contact: ${name || 'N/A'}</small>` : name || 'N/A'}
                             </td>
-                            <td style="padding: 0.75rem; text-transform: capitalize;">${reg.registrationType || 'individual'}</td>
-                            <td style="padding: 0.75rem;"><a href="mailto:${reg.email}">${reg.email}</a></td>
-                            <td style="padding: 0.75rem;"><a href="tel:${reg.phone}">${reg.phone}</a></td>
-                            <td style="padding: 0.75rem;">${reg.numberOfAttendees || 1}</td>
+                            <td style="padding: 0.75rem; text-transform: capitalize;">${reg.registration_type || 'individual'}</td>
+                            <td style="padding: 0.75rem;"><a href="mailto:${email}">${email || 'N/A'}</a></td>
+                            <td style="padding: 0.75rem;"><a href="tel:${phone}">${phone || 'N/A'}</a></td>
+                            <td style="padding: 0.75rem;">${reg.number_of_attendees || 1}</td>
                             <td style="padding: 0.75rem;">
                                 ${hasDetails ? `
                                     <button class="btn btn-sm btn-info" onclick="viewAttendeeDetails(${reg.id})" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">
@@ -1684,7 +1769,7 @@ async function viewEventRegistrants(eventId) {
                                     </button>
                                 ` : '<span style="color: var(--text-secondary);">No details</span>'}
                             </td>
-                            <td style="padding: 0.75rem;">${new Date(reg.registrationDate).toLocaleDateString()}</td>
+                            <td style="padding: 0.75rem;">${new Date(reg.created_at).toLocaleDateString()}</td>
                         </tr>
                     `;
                     }).join('')}
@@ -1739,7 +1824,7 @@ async function exportRegistrantsPDF(eventId) {
             <h1>${event.title}</h1>
             <p><strong>Event Date:</strong> ${new Date(event.date).toLocaleDateString()}</p>
             <p><strong>Location:</strong> ${event.location}</p>
-            <p><strong>Total Registrations:</strong> ${eventRegistrations.length}</p>
+            <p><strong>Total Registrations:</strong> ${registrations.length}</p>
             <table>
                 <thead>
                     <tr>
@@ -1755,16 +1840,21 @@ async function exportRegistrantsPDF(eventId) {
                 <tbody>
     `;
     
-        eventRegistrations.forEach((reg, index) => {
+        registrations.forEach((reg, index) => {
+            const name = reg.registration_type === 'organization' 
+                ? `${reg.organization_name || 'N/A'} (Contact: ${reg.contact_person || 'N/A'})` 
+                : reg.registrant_name || 'N/A';
+            const email = reg.registration_type === 'organization' ? reg.contact_email : reg.registrant_email;
+            const phone = reg.registration_type === 'organization' ? reg.contact_phone : reg.registrant_phone;
             pdfContent += `
                 <tr>
                     <td>${index + 1}</td>
-                    <td>${reg.registrationType === 'organization' ? `${reg.organizationName || 'N/A'} (Contact: ${reg.name || 'N/A'})` : reg.name || 'N/A'}</td>
-                    <td>${reg.registrationType || 'individual'}</td>
-                    <td>${reg.email}</td>
-                    <td>${reg.phone}</td>
-                    <td>${reg.numberOfAttendees || 1}</td>
-                    <td>${new Date(reg.registrationDate).toLocaleDateString()}</td>
+                    <td>${name}</td>
+                    <td>${reg.registration_type || 'individual'}</td>
+                    <td>${email || 'N/A'}</td>
+                    <td>${phone || 'N/A'}</td>
+                    <td>${reg.number_of_attendees || 1}</td>
+                    <td>${new Date(reg.created_at).toLocaleDateString()}</td>
                 </tr>
             `;
         });
@@ -1870,23 +1960,39 @@ function cleanContactInfo(value) {
     return cleaned || null;
 }
 
-function viewAttendeeDetails(registrationId) {
-    const registrations = JSON.parse(localStorage.getItem('event-registrations') || '[]');
-    const registration = registrations.find(r => r.id === registrationId);
-    
-    if (!registration || !registration.attendeeDetails || registration.attendeeDetails.length === 0) {
-        alert('No attendee details available.');
-        return;
-    }
-    
-    // Store the current event ID to refresh the view after closing
-    const container = document.getElementById('event-registrations-container');
-    const currentEventId = container ? container.getAttribute('data-current-event-id') : null;
-    
-    let detailsHTML = `
+async function viewAttendeeDetails(registrationId) {
+    try {
+        if (!window.supabase) {
+            alert('Database connection not available.');
+            return;
+        }
+
+        const { data: registration, error } = await window.supabase
+            .from('event_registrations')
+            .select('*')
+            .eq('id', registrationId)
+            .single();
+        
+        if (error || !registration) {
+            alert('Registration not found.');
+            return;
+        }
+        
+        if (!registration.attendee_details || registration.attendee_details.length === 0) {
+            alert('No attendee details available.');
+            return;
+        }
+        
+        // Store the current event ID to refresh the view after closing
+        const container = document.getElementById('event-registrations-container');
+        const currentEventId = container ? container.getAttribute('data-current-event-id') : null;
+        
+        const orgName = registration.registration_type === 'organization' ? registration.organization_name : registration.registrant_name;
+        
+        let detailsHTML = `
         <div style="max-width: 800px; margin: 0 auto;">
             <h3 style="margin-bottom: 1rem; color: var(--navy-blue);">Attendee Details</h3>
-            <p style="margin-bottom: 1.5rem;"><strong>Registration:</strong> ${registration.registrationType === 'organization' ? registration.organizationName : registration.name}</p>
+            <p style="margin-bottom: 1.5rem;"><strong>Registration:</strong> ${orgName}</p>
             <table class="registrants-table" style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
                 <thead>
                     <tr style="background: var(--bg-secondary);">
@@ -1900,7 +2006,7 @@ function viewAttendeeDetails(registrationId) {
                 <tbody>
     `;
     
-    registration.attendeeDetails.forEach((attendee, index) => {
+        registration.attendee_details.forEach((attendee, index) => {
         // Clean contact information
         const cleanEmail = cleanContactInfo(attendee.email);
         const cleanPhone = cleanContactInfo(attendee.phone);
@@ -1969,32 +2075,46 @@ function viewAttendeeDetails(registrationId) {
     };
     document.addEventListener('keydown', escapeHandler);
     
-    document.body.appendChild(modal);
+        document.body.appendChild(modal);
+    } catch (error) {
+        console.error('Error viewing attendee details:', error);
+        alert('Error loading attendee details. Please try again.');
+    }
 }
 
 // Bulk Email Functionality
 async function openBulkEmailModal(eventId) {
     try {
-        const registrations = JSON.parse(localStorage.getItem('event-registrations') || '[]');
-        const eventRegistrations = registrations.filter(reg => reg.eventId.toString() === eventId.toString());
-        
         if (!window.supabase) {
             alert('Database connection not available.');
             return;
         }
 
-        const { data: event, error } = await window.supabase
+        const { data: event, error: eventError } = await window.supabase
             .from('events')
             .select('*')
             .eq('id', eventId)
             .single();
         
-        if (error || !event) {
+        if (eventError || !event) {
             alert('Event not found.');
             return;
         }
+
+        const { data: eventRegistrations, error: regError } = await window.supabase
+            .from('event_registrations')
+            .select('*')
+            .eq('event_id', eventId)
+            .order('created_at', { ascending: false });
         
-        if (eventRegistrations.length === 0) {
+        if (regError) {
+            alert('Error loading registrations.');
+            return;
+        }
+        
+        const registrations = eventRegistrations || [];
+        
+        if (registrations.length === 0) {
             alert('No registrations found for this event.');
             return;
         }
@@ -2003,42 +2123,43 @@ async function openBulkEmailModal(eventId) {
         const recipientEmails = new Set();
         const recipientList = [];
         
-        eventRegistrations.forEach(reg => {
-        // Add main registrant email
-        if (reg.email) {
-            const cleanEmail = cleanContactInfo(reg.email);
-            if (cleanEmail && !recipientEmails.has(cleanEmail)) {
-                recipientEmails.add(cleanEmail);
-                recipientList.push({
-                    email: cleanEmail,
-                    name: reg.name || reg.organizationName || 'Attendee',
-                    type: reg.registrationType || 'individual'
+        registrations.forEach(reg => {
+            // Add main registrant email
+            const email = reg.registration_type === 'organization' ? reg.contact_email : reg.registrant_email;
+            if (email) {
+                const cleanEmail = cleanContactInfo(email);
+                if (cleanEmail && !recipientEmails.has(cleanEmail)) {
+                    recipientEmails.add(cleanEmail);
+                    recipientList.push({
+                        email: cleanEmail,
+                        name: reg.registration_type === 'organization' ? (reg.organization_name || reg.contact_person) : reg.registrant_name || 'Attendee',
+                        type: reg.registration_type || 'individual'
+                    });
+                }
+            }
+            
+            // Add attendee emails if available
+            if (reg.attendee_details && reg.attendee_details.length > 0) {
+                reg.attendee_details.forEach(attendee => {
+                    if (attendee.email) {
+                        const cleanEmail = cleanContactInfo(attendee.email);
+                        if (cleanEmail && !recipientEmails.has(cleanEmail)) {
+                            recipientEmails.add(cleanEmail);
+                            recipientList.push({
+                                email: cleanEmail,
+                                name: attendee.name || 'Attendee',
+                                type: 'attendee'
+                            });
+                        }
+                    }
                 });
             }
-        }
+        });
+    
+        const totalRecipients = recipientEmails.size;
         
-        // Add attendee emails if available
-        if (reg.attendeeDetails && reg.attendeeDetails.length > 0) {
-            reg.attendeeDetails.forEach(attendee => {
-                if (attendee.email) {
-                    const cleanEmail = cleanContactInfo(attendee.email);
-                    if (cleanEmail && !recipientEmails.has(cleanEmail)) {
-                        recipientEmails.add(cleanEmail);
-                        recipientList.push({
-                            email: cleanEmail,
-                            name: attendee.name || 'Attendee',
-                            type: 'attendee'
-                        });
-                    }
-                }
-            });
-        }
-    });
-    
-    const totalRecipients = recipientEmails.size;
-    
-    // Default invitation message template
-    const defaultMessage = `Dear ${eventRegistrations.length === 1 ? 'Attendee' : 'Attendees'},
+        // Default invitation message template
+        const defaultMessage = `Dear ${registrations.length === 1 ? 'Attendee' : 'Attendees'},
 
 You are cordially invited to attend:
 

@@ -137,24 +137,24 @@ const simulateFormSubmission = (formData) => {
                 console.log('Image file detected:', imageFile.name, imageFile.size);
                 // Convert to base64 for localStorage (in production, upload to server)
                 const reader = new FileReader();
-                reader.onload = (e) => {
+                reader.onload = async (e) => {
                     storyData.imageUrl = e.target.result;
                     storyData.imageName = imageFile.name;
                     console.log('Image converted, saving story...');
-                    savePendingStory(storyData);
+                    await savePendingStory(storyData);
                     resolve({ success: true });
                 };
-                reader.onerror = (error) => {
+                reader.onerror = async (error) => {
                     console.error('Error reading image file:', error);
                     storyData.imageUrl = '';
                     storyData.imageName = '';
-                    savePendingStory(storyData);
+                    await savePendingStory(storyData);
                     resolve({ success: true });
                 };
                 reader.readAsDataURL(imageFile);
             } else {
                 console.log('No image file, saving story directly...');
-                savePendingStory(storyData);
+                await savePendingStory(storyData);
                 resolve({ success: true });
             }
         } catch (error) {
@@ -164,64 +164,48 @@ const simulateFormSubmission = (formData) => {
     });
 };
 
-// Save pending story to localStorage
-const savePendingStory = (storyData) => {
+// Save pending story to Supabase
+const savePendingStory = async (storyData) => {
     try {
-        // Check if localStorage is available
-        if (typeof Storage === 'undefined') {
-            console.error('localStorage is not available');
-            throw new Error('localStorage is not available');
+        if (!window.supabase) {
+            console.error('Supabase not available');
+            throw new Error('Database connection not available. Please refresh the page and try again.');
         }
         
-        // Get existing stories
-        let pendingStories = [];
-        try {
-            const stored = localStorage.getItem('pending-stories');
-            if (stored) {
-                pendingStories = JSON.parse(stored);
-            }
-        } catch (e) {
-            console.warn('Error parsing existing stories, starting fresh:', e);
-            pendingStories = [];
+        // Prepare data for Supabase (pending_stories table)
+        const pendingStoryData = {
+            name: storyData.name,
+            role: storyData.role || null,
+            quote: storyData.story || storyData.quote,
+            tags: storyData.program || storyData.tags || null,
+            status: 'pending'
+        };
+        
+        // Insert into Supabase
+        const { data: insertedStory, error } = await window.supabase
+            .from('pending_stories')
+            .insert([pendingStoryData])
+            .select();
+        
+        if (error) {
+            console.error('Error saving story to Supabase:', error);
+            throw new Error(`Failed to save story: ${error.message || 'Please try again.'}`);
         }
         
-        // Add new story
-        pendingStories.push(storyData);
-        
-        // Save to localStorage
-        try {
-            localStorage.setItem('pending-stories', JSON.stringify(pendingStories));
-            
-            // Verify it was saved
-            const verify = localStorage.getItem('pending-stories');
-            if (!verify) {
-                throw new Error('Failed to save to localStorage');
-            }
-            
-            // Debug logging
-            console.log('✅ Story saved to localStorage:', storyData);
-            console.log('✅ Total pending stories:', pendingStories.length);
-            console.log('✅ Verification - localStorage now contains:', JSON.parse(verify).length, 'stories');
-            
-        } catch (e) {
-            console.error('Error writing to localStorage:', e);
-            // Check if it's a quota exceeded error
-            if (e.name === 'QuotaExceededError') {
-                throw new Error('Storage quota exceeded. Please clear some data and try again.');
-            }
-            throw e;
-        }
+        // Debug logging
+        console.log('✅ Story saved to Supabase:', insertedStory);
+        console.log('✅ Story ID:', insertedStory[0]?.id);
         
         // Trigger event for admin panel
         try {
-            window.dispatchEvent(new CustomEvent('new-pending-story', { detail: storyData }));
-            window.dispatchEvent(new CustomEvent('pending-stories-updated', { detail: { count: pendingStories.length } }));
+            window.dispatchEvent(new CustomEvent('new-pending-story', { detail: insertedStory[0] }));
+            window.dispatchEvent(new CustomEvent('pending-stories-updated', { detail: { count: 1 } }));
         } catch (e) {
             console.warn('Error dispatching events:', e);
         }
         
     } catch (error) {
-        console.error('❌ Error saving story to localStorage:', error);
+        console.error('❌ Error saving story to Supabase:', error);
         alert('Error saving your story. Please try again or contact support if the problem persists.');
         throw error;
     }

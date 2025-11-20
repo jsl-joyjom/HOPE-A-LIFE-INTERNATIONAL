@@ -5,31 +5,48 @@
     let attendeeDetails = [];
     let attendeeRowCounter = 0;
     
-    function getEventCapacity() {
-        if (!currentEventData) return { total: 0, registered: 0, remaining: 0, maxOrg: null };
+    async function getEventCapacity() {
+        if (!currentEventData || !currentEventId) return { total: 0, registered: 0, remaining: 0, maxOrg: null };
         
-        const registrations = JSON.parse(localStorage.getItem('event-registrations') || '[]');
-        const eventRegistrations = registrations.filter(reg => reg.eventId.toString() === currentEventId.toString());
-        const totalRegistered = eventRegistrations.reduce((sum, reg) => sum + (reg.numberOfAttendees || 1), 0);
-        const maxTotal = currentEventData.maxAttendees || 0;
-        const remaining = maxTotal > 0 ? Math.max(0, maxTotal - totalRegistered) : Infinity;
-        
-        return {
-            total: maxTotal,
-            registered: totalRegistered,
-            remaining: remaining,
-            maxOrg: currentEventData.maxAttendeesPerOrganization || null
-        };
+        try {
+            if (!window.supabase) {
+                return { total: 0, registered: 0, remaining: 0, maxOrg: null };
+            }
+
+            const { data: eventRegistrations, error } = await window.supabase
+                .from('event_registrations')
+                .select('number_of_attendees')
+                .eq('event_id', currentEventId);
+            
+            if (error) {
+                console.error('Error fetching registrations:', error);
+                return { total: 0, registered: 0, remaining: 0, maxOrg: null };
+            }
+            
+            const totalRegistered = (eventRegistrations || []).reduce((sum, reg) => sum + (reg.number_of_attendees || 1), 0);
+            const maxTotal = currentEventData.max_attendees || currentEventData.maxAttendees || 0;
+            const remaining = maxTotal > 0 ? Math.max(0, maxTotal - totalRegistered) : Infinity;
+            
+            return {
+                total: maxTotal,
+                registered: totalRegistered,
+                remaining: remaining,
+                maxOrg: currentEventData.max_attendees_per_organization || currentEventData.maxAttendeesPerOrganization || null
+            };
+        } catch (error) {
+            console.error('Error in getEventCapacity:', error);
+            return { total: 0, registered: 0, remaining: 0, maxOrg: null };
+        }
     }
     
-    function updateCapacityInfo() {
+    async function updateCapacityInfo() {
         const capacityInfo = document.getElementById('capacity-info');
         const attendeesInput = document.getElementById('number-of-attendees');
         const orgWarning = document.getElementById('org-capacity-warning');
         
         if (!capacityInfo || !attendeesInput) return;
         
-        const capacity = getEventCapacity();
+        const capacity = await getEventCapacity();
         const requestedAttendees = parseInt(attendeesInput.value) || 1;
         const registrationType = document.getElementById('registration-type').value;
         
@@ -106,24 +123,24 @@
                 documents: event.documents || []
             };
         
-            // Check if event is full
-            const capacity = getEventCapacity();
-            if (capacity.total > 0 && capacity.remaining === 0) {
-                alert('Sorry, this event is full. No slots available.');
-                return;
-            }
-            
-            currentEventId = eventId;
-            eventIdInput.value = eventId;
-            attendeeDetails = [];
-            attendeeRowCounter = 0;
-            
-            // Reset form
-            form.reset();
-            document.getElementById('registration-type').value = '';
-            document.getElementById('attendees-list').innerHTML = '';
-            toggleRegistrationFields('individual');
-            updateCapacityInfo();
+        // Check if event is full
+        const capacity = await getEventCapacity();
+        if (capacity.total > 0 && capacity.remaining === 0) {
+            alert('Sorry, this event is full. No slots available.');
+            return;
+        }
+        
+        currentEventId = eventId;
+        eventIdInput.value = eventId;
+        attendeeDetails = [];
+        attendeeRowCounter = 0;
+        
+        // Reset form
+        form.reset();
+        document.getElementById('registration-type').value = '';
+        document.getElementById('attendees-list').innerHTML = '';
+        toggleRegistrationFields('individual');
+        await updateCapacityInfo();
             
             // Update modal title
             const title = document.getElementById('registration-modal-title');
@@ -661,9 +678,9 @@
         reader.readAsText(file);
     }
     
-    function saveRegistration(formData) {
+    async function saveRegistration(formData) {
         try {
-            const capacity = getEventCapacity();
+            const capacity = await getEventCapacity();
             const requestedAttendees = parseInt(formData.numberOfAttendees) || 1;
             
             // Check capacity
@@ -688,20 +705,32 @@
                 }
             }
             
-            const registrations = JSON.parse(localStorage.getItem('event-registrations') || '[]');
-            
-            // Check for duplicate email/phone in existing registrations
+            // Check for duplicates in Supabase
+            if (!window.supabase) {
+                showAlert('Database connection not available. Please refresh the page and try again.', 'error');
+                return false;
+            }
+
             const cleanEmail = cleanContactValue(formData.email);
             const cleanPhone = cleanContactValue(formData.phone);
             
-            const duplicateCheck = registrations.filter(reg => {
-                if (!reg.eventId || reg.eventId.toString() !== currentEventId.toString()) {
-                    return false;
-                }
-                
+            // Fetch existing registrations for this event from Supabase
+            const { data: existingRegistrations, error: fetchError } = await window.supabase
+                .from('event_registrations')
+                .select('*')
+                .eq('event_id', currentEventId);
+            
+            if (fetchError) {
+                console.error('Error checking duplicates:', fetchError);
+                showAlert('Error checking registration. Please try again.', 'error');
+                return false;
+            }
+            
+            // Check for duplicate email/phone in existing registrations
+            const duplicateCheck = (existingRegistrations || []).filter(reg => {
                 // Check main registrant
-                const regCleanEmail = cleanContactValue(reg.email);
-                const regCleanPhone = cleanContactValue(reg.phone);
+                const regCleanEmail = cleanContactValue(reg.registrant_email || reg.contact_email);
+                const regCleanPhone = cleanContactValue(reg.registrant_phone || reg.contact_phone);
                 
                 if (cleanEmail && regCleanEmail && cleanEmail === regCleanEmail) {
                     return true;
@@ -711,8 +740,8 @@
                 }
                 
                 // Check attendee details
-                if (reg.attendeeDetails && reg.attendeeDetails.length > 0) {
-                    return reg.attendeeDetails.some(attendee => {
+                if (reg.attendee_details && reg.attendee_details.length > 0) {
+                    return reg.attendee_details.some(attendee => {
                         const attendeeCleanEmail = cleanContactValue(attendee.email);
                         const attendeeCleanPhone = cleanContactValue(attendee.phone);
                         return (cleanEmail && attendeeCleanEmail && cleanEmail === attendeeCleanEmail) ||
@@ -726,10 +755,12 @@
             if (duplicateCheck.length > 0) {
                 const duplicateReg = duplicateCheck[0];
                 let errorMsg = '❌ This contact information is already registered for this event:\n\n';
-                if (cleanEmail && cleanContactValue(duplicateReg.email) === cleanEmail) {
+                const regEmail = duplicateReg.registrant_email || duplicateReg.contact_email;
+                const regPhone = duplicateReg.registrant_phone || duplicateReg.contact_phone;
+                if (cleanEmail && cleanContactValue(regEmail) === cleanEmail) {
                     errorMsg += `Email "${formData.email}" is already registered.\n`;
                 }
-                if (cleanPhone && cleanContactValue(duplicateReg.phone) === cleanPhone) {
+                if (cleanPhone && cleanContactValue(regPhone) === cleanPhone) {
                     errorMsg += `Phone "${formData.phone}" is already registered.\n`;
                 }
                 errorMsg += '\nPlease use a different email or phone number.';
@@ -739,7 +770,7 @@
             
             // Check for duplicates within attendee details (for organizations)
             if (formData.registrationType === 'organization' && attendeeDetails.length > 0) {
-                const attendeeErrors = checkDuplicates(attendeeDetails, registrations, currentEventId);
+                const attendeeErrors = checkDuplicates(attendeeDetails, existingRegistrations, currentEventId);
                 if (attendeeErrors.length > 0) {
                     let errorMsg = '❌ Duplicate contact information found in attendee list:\n\n';
                     attendeeErrors.forEach(error => {
@@ -751,29 +782,38 @@
                 }
             }
             
-            const registration = {
-                id: Date.now() + Math.random(),
-                eventId: currentEventId,
-                eventTitle: currentEventData ? currentEventData.title : 'Unknown Event',
-                eventDate: currentEventData ? currentEventData.date : '',
-                registrationDate: new Date().toISOString(),
-                registrationType: formData.registrationType,
-                name: formData.registrationType === 'individual' ? formData.name : formData.contactPerson,
-                organizationName: formData.registrationType === 'organization' ? formData.organizationName : null,
-                email: formData.email,
-                phone: formData.phone,
-                address: formData.address || '',
-                additionalNotes: formData.additionalNotes || '',
-                numberOfAttendees: requestedAttendees,
-                attendeeDetails: formData.registrationType === 'organization' ? attendeeDetails : [],
-                status: 'registered'
+            // Prepare registration data for Supabase
+            const registrationData = {
+                event_id: currentEventId,
+                registration_type: formData.registrationType,
+                registrant_name: formData.registrationType === 'individual' ? formData.name : null,
+                registrant_email: formData.registrationType === 'individual' ? formData.email : null,
+                registrant_phone: formData.registrationType === 'individual' ? formData.phone : null,
+                organization_name: formData.registrationType === 'organization' ? formData.organizationName : null,
+                contact_person: formData.registrationType === 'organization' ? formData.contactPerson : null,
+                contact_email: formData.registrationType === 'organization' ? formData.email : null,
+                contact_phone: formData.registrationType === 'organization' ? formData.phone : null,
+                number_of_attendees: requestedAttendees,
+                attendee_details: formData.registrationType === 'organization' ? attendeeDetails : [],
+                special_requirements: formData.specialRequirements || null,
+                dietary_restrictions: formData.dietaryRestrictions || null,
+                additional_notes: formData.additionalNotes || null
             };
             
-            registrations.push(registration);
-            localStorage.setItem('event-registrations', JSON.stringify(registrations));
+            // Insert into Supabase
+            const { data: insertedRegistration, error: insertError } = await window.supabase
+                .from('event_registrations')
+                .insert([registrationData])
+                .select();
+            
+            if (insertError) {
+                console.error('Error saving registration:', insertError);
+                showAlert(`Error saving registration: ${insertError.message || 'Please try again.'}`, 'error');
+                return false;
+            }
             
             // Dispatch event for admin panel
-            window.dispatchEvent(new CustomEvent('event-registration-added', { detail: registration }));
+            window.dispatchEvent(new CustomEvent('event-registration-added', { detail: insertedRegistration[0] }));
             
             return true;
         } catch (error) {
@@ -826,8 +866,8 @@
         
         // Number of attendees change handler
         if (attendeesInput) {
-            attendeesInput.addEventListener('input', () => {
-                updateCapacityInfo();
+            attendeesInput.addEventListener('input', async () => {
+                await updateCapacityInfo();
                 const registrationType = document.getElementById('registration-type').value;
                 if (registrationType === 'organization') {
                     const count = parseInt(attendeesInput.value) || 1;
@@ -838,7 +878,7 @@
         
         // Form submission
         if (form) {
-            form.addEventListener('submit', (e) => {
+            form.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 
                 const formData = new FormData(form);
@@ -872,7 +912,7 @@
                 }
                 
                 // Save registration
-                if (saveRegistration(data)) {
+                if (await saveRegistration(data)) {
                     showAlert('✅ Registration submitted successfully! You will receive a confirmation email shortly.', 'success');
                     
                     setTimeout(() => {
