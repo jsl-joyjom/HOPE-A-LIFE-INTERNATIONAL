@@ -1,0 +1,99 @@
+# Operating System Files
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+.DS_Store
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# Editor and IDE Files
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# Temporary Files
+*.tmp
+*.temp
+*.bak
+*.backup
+*.old
+*.orig
+*.log
+
+# Cache Files
+.cache/
+*.cache
+.sass-cache/
+*.css.map
+
+# Build and Distribution
+dist/
+build/
+*.min.js
+*.min.css
+
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# Sensitive Files
+*.key
+*.pem
+*.p12
+*.pfx
+secrets/
+credentials/
+
+# Testing
+coverage/
+.nyc_output/
+*.test.js.snap
+
+# Miscellaneous
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
