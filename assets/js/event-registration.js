@@ -1,8 +1,39 @@
 // Event Registration System with Capacity Management and Attendee Details
+// Explicit data flow - no hidden global dependencies
+
+// ✅ SAFETY OVERRIDE: Prevent any cached/duplicate validateAttendeeDetails from causing issues
+// This ensures we always use the correct, explicit version
 (function() {
+    'use strict';
+    
+    // Diagnostic logging to verify script loading and dependencies
+    console.log('✅ event-registration.js loaded');
+    console.log('✅ Supabase available:', typeof window.supabase !== 'undefined');
+    
+    // Debug: Check for any global registrations variable (should be undefined)
+    console.log('=== REGISTRATIONS DEBUG ===');
+    console.log('typeof registrations:', typeof registrations);
+    console.log('registrations value:', typeof registrations !== 'undefined' ? registrations : 'undefined (correct - no global dependency)');
+    console.log('=== END DEBUG ===');
+    
+    // ✅ SAFETY: Clear any potentially cached/broken global function
+    if (typeof window.validateAttendeeDetails === 'function') {
+        console.warn('⚠️ Found existing validateAttendeeDetails on window - clearing it');
+        console.warn('⚠️ This may indicate a cached version or duplicate function');
+        delete window.validateAttendeeDetails;
+    }
+    
+    // ✅ SAFETY: Ensure no global registrations variable exists
+    if (typeof registrations !== 'undefined') {
+        console.error('❌ CRITICAL: Global registrations variable detected at script load!');
+        console.error('❌ This indicates a code conflict or cached version issue');
+        console.error('❌ Value:', registrations);
+        // Don't throw here - let the function handle it
+    }
+    
     let currentEventId = null;
     let currentEventData = null;
-    let attendeeDetails = [];
+    let attendeeDetails = []; // Module-scoped variable, not global
     let attendeeRowCounter = 0;
     
     async function getEventCapacity() {
@@ -148,10 +179,22 @@
                 title.textContent = `Register for: ${currentEventData.title}`;
             }
             
-            // Show modal
-            modal.setAttribute('aria-hidden', 'false');
+            // Show modal - ensure aria-hidden is removed when modal is active
+            modal.removeAttribute('aria-hidden');
             modal.classList.add('active');
+            
+            // Prevent body scroll when modal is open
+            // Store original overflow value to restore it later
+            if (!document.body.dataset.originalOverflow) {
+                document.body.dataset.originalOverflow = window.getComputedStyle(document.body).overflow;
+            }
             document.body.style.overflow = 'hidden';
+            
+            // Focus management - focus first focusable element in modal
+            const firstFocusable = modal.querySelector('input, button, select, textarea, [tabindex]:not([tabindex="-1"])');
+            if (firstFocusable) {
+                setTimeout(() => firstFocusable.focus(), 100);
+            }
         } catch (error) {
             console.error('Error loading event for registration:', error);
             alert('Error loading event. Please try again.');
@@ -162,13 +205,20 @@
         const modal = document.getElementById('event-registration-modal');
         if (!modal) return;
         
+        // Hide modal and restore accessibility attributes
         modal.setAttribute('aria-hidden', 'true');
         modal.classList.remove('active');
-        document.body.style.overflow = '';
         
+        // Restore body scroll
+        const originalOverflow = document.body.dataset.originalOverflow || '';
+        document.body.style.overflow = originalOverflow;
+        delete document.body.dataset.originalOverflow;
+        
+        // Reset form and clear data
         const form = document.getElementById('event-registration-form');
         if (form) form.reset();
-        document.getElementById('attendees-list').innerHTML = '';
+        const attendeesList = document.getElementById('attendees-list');
+        if (attendeesList) attendeesList.innerHTML = '';
         attendeeDetails = [];
         attendeeRowCounter = 0;
         
@@ -240,27 +290,52 @@
             </div>
         `;
         
-        // Add event listeners for real-time validation
+        // Add event listeners for real-time validation and data collection
+        const nameInput = row.querySelector('.attendee-name');
+        const positionInput = row.querySelector('.attendee-position');
         const emailInput = row.querySelector('.attendee-email');
         const phoneInput = row.querySelector('.attendee-phone');
         
+        // Update attendee details whenever any field changes
+        const updateOnChange = () => {
+            updateAttendeeDetails();
+        };
+        
+        if (nameInput) {
+            nameInput.addEventListener('input', updateOnChange);
+            nameInput.addEventListener('blur', updateOnChange);
+        }
+        
+        if (positionInput) {
+            positionInput.addEventListener('input', updateOnChange);
+            positionInput.addEventListener('blur', updateOnChange);
+        }
+        
         if (emailInput) {
-            emailInput.addEventListener('blur', () => validateAttendeeDetails());
+            emailInput.addEventListener('blur', () => {
+                validateAttendeeDetails().catch(err => console.warn('⚠️ Validation error:', err));
+                updateAttendeeDetails();
+            });
             emailInput.addEventListener('input', () => {
                 // Clear error on input
                 emailInput.style.borderColor = '';
                 const errorMsg = emailInput.parentElement.querySelector('.field-error');
                 if (errorMsg) errorMsg.remove();
+                updateAttendeeDetails();
             });
         }
         
         if (phoneInput) {
-            phoneInput.addEventListener('blur', () => validateAttendeeDetails());
+            phoneInput.addEventListener('blur', () => {
+                validateAttendeeDetails().catch(err => console.warn('⚠️ Validation error:', err));
+                updateAttendeeDetails();
+            });
             phoneInput.addEventListener('input', () => {
                 // Clear error on input
                 phoneInput.style.borderColor = '';
                 const errorMsg = phoneInput.parentElement.querySelector('.field-error');
                 if (errorMsg) errorMsg.remove();
+                updateAttendeeDetails();
             });
         }
         
@@ -283,27 +358,92 @@
         }
     }
     
-    function updateAttendeeDetails() {
+    // Build attendees array from DOM inputs (explicit, no hidden dependencies)
+    function buildAttendeesFromDOM() {
         const rows = document.querySelectorAll('.attendee-row');
-        attendeeDetails = [];
+        const attendees = [];
         
-        rows.forEach(row => {
-            const name = row.querySelector('.attendee-name').value.trim();
+        rows.forEach((row, index) => {
+            const nameInput = row.querySelector('.attendee-name');
+            const positionInput = row.querySelector('.attendee-position');
+            const emailInput = row.querySelector('.attendee-email');
+            const phoneInput = row.querySelector('.attendee-phone');
+            
+            if (!nameInput) {
+                console.warn(`⚠️ Attendee row ${index} missing name input`);
+                return;
+            }
+            
+            const name = nameInput.value.trim();
             if (name) {
-                attendeeDetails.push({
+                attendees.push({
                     name: name,
-                    position: row.querySelector('.attendee-position').value.trim() || '',
-                    email: row.querySelector('.attendee-email').value.trim() || '',
-                    phone: row.querySelector('.attendee-phone').value.trim() || ''
+                    position: positionInput ? positionInput.value.trim() : '',
+                    email: emailInput ? emailInput.value.trim() : '',
+                    phone: phoneInput ? phoneInput.value.trim() : ''
                 });
             }
         });
         
-        // Validate for duplicates and show warnings
-        validateAttendeeDetails();
+        return attendees;
     }
     
-    function validateAttendeeDetails() {
+    // Build attendees from DOM inputs - explicit return, no global dependency
+    // formData parameter is optional - function builds from DOM directly (explicit, no hidden dependencies)
+    function updateAttendeeDetails(formData) {
+        // Explicitly build attendees from DOM (no global dependency, no formData dependency)
+        const attendees = buildAttendeesFromDOM();
+        attendeeDetails = attendees; // Keep for backward compatibility with other parts of code
+        
+        console.log(`📝 Updated attendee details: ${attendees.length} attendees collected`);
+        console.log('📝 Attendees array:', attendees);
+        
+        // Validate structure explicitly (synchronous validation)
+        if (attendees.length > 0) {
+            try {
+                validateAttendeesArray(attendees);
+                console.log('✅ Attendee structure validation passed');
+            } catch (validationError) {
+                console.warn('⚠️ Attendee structure validation warning:', validationError.message);
+            }
+        }
+        
+        // Validate for duplicates and show warnings (async, but don't await - run in background)
+        // This checks against Supabase, not a global variable - completely explicit
+        validateAttendeeDetails().catch(err => {
+            console.warn('⚠️ Error in validateAttendeeDetails (duplicate check):', err);
+        });
+        
+        return attendees; // Return explicitly for explicit usage
+    }
+    
+    // Validate attendees array (explicit parameter, no global dependency)
+    function validateAttendeesArray(attendees) {
+        if (!Array.isArray(attendees)) {
+            throw new Error('Attendees must be an array');
+        }
+        // Note: We allow empty arrays for organizations (attendee details are optional)
+        // But we validate that if provided, they have required fields
+        attendees.forEach((attendee, index) => {
+            if (!attendee.name || attendee.name.trim() === '') {
+                throw new Error(`Attendee ${index + 1} is missing a name`);
+            }
+        });
+        return true;
+    }
+    
+    // Validate attendee details for duplicates (explicit, no global dependencies)
+    // This function checks DOM inputs against Supabase - completely self-contained
+    // ✅ SAFETY: This function is completely isolated - no global dependencies
+    async function validateAttendeeDetails() {
+        // ✅ EXPLICIT: NO GLOBAL DEPENDENCIES - all data fetched explicitly from DOM and Supabase
+        // ✅ SAFETY CHECK: Ensure no global 'registrations' variable is accessed
+        if (typeof registrations !== 'undefined') {
+            console.error('❌ ERROR: Global registrations variable detected! This should not exist.');
+            console.error('❌ Stack trace:', new Error().stack);
+            throw new Error('Global registrations variable detected - this indicates a code conflict');
+        }
+        
         const rows = document.querySelectorAll('.attendee-row');
         
         // Clear previous error indicators
@@ -327,31 +467,50 @@
         const existingEmails = new Set();
         const existingPhones = new Set();
         
-        // Collect existing registrations
-        registrations.forEach(reg => {
-            if (reg.eventId && reg.eventId.toString() === currentEventId.toString()) {
-                if (reg.email) {
-                    const cleanEmail = cleanContactValue(reg.email);
-                    if (cleanEmail) existingEmails.add(cleanEmail);
-                }
-                if (reg.phone) {
-                    const cleanPhone = cleanContactValue(reg.phone);
-                    if (cleanPhone) existingPhones.add(cleanPhone);
-                }
-                if (reg.attendeeDetails) {
-                    reg.attendeeDetails.forEach(attendee => {
-                        if (attendee.email) {
-                            const cleanEmail = cleanContactValue(attendee.email);
+        // Fetch existing registrations from Supabase for this event
+        if (window.supabase && currentEventId) {
+            try {
+                const { data: existingRegistrations, error } = await window.supabase
+                    .from('event_registrations')
+                    .select('*')
+                    .eq('event_id', currentEventId);
+                
+                if (!error && existingRegistrations) {
+                    // Collect existing registrations
+                    existingRegistrations.forEach(reg => {
+                        // Check main registrant email/phone
+                        const regEmail = reg.registrant_email || reg.contact_email;
+                        const regPhone = reg.registrant_phone || reg.contact_phone;
+                        
+                        if (regEmail) {
+                            const cleanEmail = cleanContactValue(regEmail);
                             if (cleanEmail) existingEmails.add(cleanEmail);
                         }
-                        if (attendee.phone) {
-                            const cleanPhone = cleanContactValue(attendee.phone);
+                        if (regPhone) {
+                            const cleanPhone = cleanContactValue(regPhone);
                             if (cleanPhone) existingPhones.add(cleanPhone);
+                        }
+                        
+                        // Check attendee details
+                        if (reg.attendee_details && Array.isArray(reg.attendee_details)) {
+                            reg.attendee_details.forEach(attendee => {
+                                if (attendee.email) {
+                                    const cleanEmail = cleanContactValue(attendee.email);
+                                    if (cleanEmail) existingEmails.add(cleanEmail);
+                                }
+                                if (attendee.phone) {
+                                    const cleanPhone = cleanContactValue(attendee.phone);
+                                    if (cleanPhone) existingPhones.add(cleanPhone);
+                                }
+                            });
                         }
                     });
                 }
+            } catch (error) {
+                console.warn('⚠️ Error fetching existing registrations for validation:', error);
+                // Continue with validation even if fetch fails
             }
-        });
+        }
         
         // Check each row
         rows.forEach((row, index) => {
@@ -444,20 +603,26 @@
         // Collect existing registrations for this event
         if (existingRegistrations && currentEventId) {
             existingRegistrations.forEach(reg => {
-                if (reg.eventId && reg.eventId.toString() === currentEventId.toString()) {
-                    // Check main registrant
-                    if (reg.email) {
-                        const cleanEmail = cleanContactValue(reg.email);
+                // Supabase returns snake_case (event_id), but also check camelCase (eventId) for compatibility
+                const regEventId = reg.event_id || reg.eventId;
+                if (regEventId && regEventId.toString() === currentEventId.toString()) {
+                    // Check main registrant - Supabase uses snake_case
+                    const regEmail = reg.registrant_email || reg.contact_email || reg.email;
+                    const regPhone = reg.registrant_phone || reg.contact_phone || reg.phone;
+                    
+                    if (regEmail) {
+                        const cleanEmail = cleanContactValue(regEmail);
                         if (cleanEmail) existingEmails.add(cleanEmail);
                     }
-                    if (reg.phone) {
-                        const cleanPhone = cleanContactValue(reg.phone);
+                    if (regPhone) {
+                        const cleanPhone = cleanContactValue(regPhone);
                         if (cleanPhone) existingPhones.add(cleanPhone);
                     }
                     
-                    // Check attendee details
-                    if (reg.attendeeDetails && reg.attendeeDetails.length > 0) {
-                        reg.attendeeDetails.forEach(attendee => {
+                    // Check attendee details - Supabase uses snake_case (attendee_details)
+                    const attendeeDetails = reg.attendee_details || reg.attendeeDetails || [];
+                    if (attendeeDetails && attendeeDetails.length > 0) {
+                        attendeeDetails.forEach(attendee => {
                             if (attendee.email) {
                                 const cleanEmail = cleanContactValue(attendee.email);
                                 if (cleanEmail) existingEmails.add(cleanEmail);
@@ -632,25 +797,50 @@
                         </div>
                     `;
                     
-                    // Add event listeners for real-time validation
+                    // Add event listeners for real-time validation and data collection
+                    const nameInput = row.querySelector('.attendee-name');
+                    const positionInput = row.querySelector('.attendee-position');
                     const emailInput = row.querySelector('.attendee-email');
                     const phoneInput = row.querySelector('.attendee-phone');
                     
+                    // Update attendee details whenever any field changes
+                    const updateOnChange = () => {
+                        updateAttendeeDetails();
+                    };
+                    
+                    if (nameInput) {
+                        nameInput.addEventListener('input', updateOnChange);
+                        nameInput.addEventListener('blur', updateOnChange);
+                    }
+                    
+                    if (positionInput) {
+                        positionInput.addEventListener('input', updateOnChange);
+                        positionInput.addEventListener('blur', updateOnChange);
+                    }
+                    
                     if (emailInput) {
-                        emailInput.addEventListener('blur', () => validateAttendeeDetails());
+                        emailInput.addEventListener('blur', () => {
+                            validateAttendeeDetails().catch(err => console.warn('⚠️ Validation error:', err));
+                            updateAttendeeDetails();
+                        });
                         emailInput.addEventListener('input', () => {
                             emailInput.style.borderColor = '';
                             const errorMsg = emailInput.parentElement.querySelector('.field-error');
                             if (errorMsg) errorMsg.remove();
+                            updateAttendeeDetails();
                         });
                     }
                     
                     if (phoneInput) {
-                        phoneInput.addEventListener('blur', () => validateAttendeeDetails());
+                        phoneInput.addEventListener('blur', () => {
+                            validateAttendeeDetails().catch(err => console.warn('⚠️ Validation error:', err));
+                            updateAttendeeDetails();
+                        });
                         phoneInput.addEventListener('input', () => {
                             phoneInput.style.borderColor = '';
                             const errorMsg = phoneInput.parentElement.querySelector('.field-error');
                             if (errorMsg) errorMsg.remove();
+                            updateAttendeeDetails();
                         });
                     }
                     
@@ -658,7 +848,9 @@
                 });
                 
                 // Run validation after adding all rows
-                setTimeout(() => validateAttendeeDetails(), 100);
+                setTimeout(() => {
+                    validateAttendeeDetails().catch(err => console.warn('⚠️ Validation error:', err));
+                }, 100);
                 
                 // Update number of attendees input
                 const numAttendees = document.getElementById('number-of-attendees');
@@ -693,14 +885,66 @@
                 return false;
             }
             
-            // For organizations, collect attendee details
+            // For organizations, collect attendee details explicitly from DOM (no hidden dependencies)
+            let finalAttendeeDetails = [];
             if (formData.registrationType === 'organization') {
-                updateAttendeeDetails();
-                // Validate that we have details for all attendees
-                if (attendeeDetails.length < requestedAttendees) {
-                    showAlert(`Please provide details for all ${requestedAttendees} attendee(s).`, 'error');
-                    return false;
+                console.log('🏢 Organization registration - collecting attendee details');
+                console.log('📊 Requested attendees:', requestedAttendees);
+                
+                // Force update attendee details before saving - ensure DOM is ready
+                try {
+                    // Small delay to ensure DOM updates are captured (especially on slower devices/networks)
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    
+                    // Explicitly build attendees from DOM (no global dependency)
+                    // Call buildAttendeesFromDOM directly - explicit data flow
+                    finalAttendeeDetails = buildAttendeesFromDOM();
+                    
+                    // Also update the module variable for backward compatibility
+                    // Pass formData explicitly (optional, but makes the call explicit)
+                    updateAttendeeDetails(formData);
+                    
+                    // Validate attendees array if provided (explicit validation)
+                    if (finalAttendeeDetails.length > 0) {
+                        try {
+                            validateAttendeesArray(finalAttendeeDetails);
+                            console.log('✅ Attendee validation passed');
+                        } catch (validationError) {
+                            console.warn('⚠️ Attendee validation warning:', validationError.message);
+                            // Filter out invalid attendees but continue
+                            finalAttendeeDetails = finalAttendeeDetails.filter(att => att.name && att.name.trim() !== '');
+                        }
+                    }
+                } catch (error) {
+                    console.error('❌ Error building attendee details:', error);
+                    // Continue anyway - try to get whatever we can from DOM
+                    try {
+                        finalAttendeeDetails = buildAttendeesFromDOM();
+                    } catch (fallbackError) {
+                        console.error('❌ Fallback attendee collection also failed:', fallbackError);
+                        finalAttendeeDetails = []; // Empty array - registration will still save
+                    }
                 }
+                
+                console.log('📝 Collected attendee details before save:', finalAttendeeDetails);
+                console.log('📊 Attendee details count:', finalAttendeeDetails.length);
+                console.log('📊 Full attendee details:', JSON.stringify(finalAttendeeDetails, null, 2));
+                
+                // For organizations, attendee details are optional but recommended
+                // We'll save whatever attendee details are provided
+                // If no attendee details are provided, we'll still save the registration
+                // but log a warning
+                if (finalAttendeeDetails.length === 0) {
+                    console.warn('⚠️ No attendee details provided for organization registration');
+                    console.warn('⚠️ Registration will be saved without attendee details');
+                    // Don't block the save - just warn
+                } else if (finalAttendeeDetails.length < requestedAttendees) {
+                    console.warn(`⚠️ Only ${finalAttendeeDetails.length} attendee(s) have details, but ${requestedAttendees} requested`);
+                    console.warn('⚠️ Registration will be saved with available attendee details');
+                    // Don't block the save - just warn
+                }
+                
+                console.log('✅ Final attendee details to save:', finalAttendeeDetails.length);
             }
             
             // Check for duplicates in Supabase
@@ -767,20 +1011,28 @@
             }
             
             // Check for duplicates within attendee details (for organizations)
-            if (formData.registrationType === 'organization' && attendeeDetails.length > 0) {
-                const attendeeErrors = checkDuplicates(attendeeDetails, existingRegistrations, currentEventId);
-                if (attendeeErrors.length > 0) {
-                    let errorMsg = '❌ Duplicate contact information found in attendee list:\n\n';
-                    attendeeErrors.forEach(error => {
-                        errorMsg += `${error.message}\n`;
-                    });
-                    errorMsg += '\nPlease fix these issues and try again.';
-                    showAlert(errorMsg, 'error');
-                    return false;
+            if (formData.registrationType === 'organization' && finalAttendeeDetails.length > 0) {
+                try {
+                    const attendeeErrors = checkDuplicates(finalAttendeeDetails, existingRegistrations, currentEventId);
+                    if (attendeeErrors && attendeeErrors.length > 0) {
+                        let errorMsg = '❌ Duplicate contact information found in attendee list:\n\n';
+                        attendeeErrors.forEach(error => {
+                            errorMsg += `${error.message}\n`;
+                        });
+                        errorMsg += '\nPlease fix these issues and try again.';
+                        showAlert(errorMsg, 'error');
+                        return false;
+                    }
+                } catch (error) {
+                    console.error('❌ Error checking attendee duplicates:', error);
+                    console.warn('⚠️ Continuing with registration despite duplicate check error');
+                    // Don't block registration if duplicate check fails - just log the error
+                    // This prevents false positives from blocking legitimate registrations
                 }
             }
             
-            // Prepare registration data for Supabase
+            // Prepare registration data for Supabase (explicit, no hidden dependencies)
+            // All validation has been done above - this is just data preparation
             const registrationData = {
                 event_id: currentEventId,
                 registration_type: formData.registrationType,
@@ -792,27 +1044,99 @@
                 contact_email: formData.registrationType === 'organization' ? formData.email : null,
                 contact_phone: formData.registrationType === 'organization' ? formData.phone : null,
                 number_of_attendees: requestedAttendees,
-                attendee_details: formData.registrationType === 'organization' ? attendeeDetails : [],
+                attendee_details: formData.registrationType === 'organization' ? (finalAttendeeDetails || []) : [],
                 special_requirements: formData.specialRequirements || null,
                 dietary_restrictions: formData.dietaryRestrictions || null,
                 additional_notes: formData.additionalNotes || null
             };
             
-            // Insert into Supabase
+            // Log registration data before saving (for debugging)
+            console.log('💾 Saving registration data to Supabase:', {
+                event_id: registrationData.event_id,
+                registration_type: registrationData.registration_type,
+                number_of_attendees: registrationData.number_of_attendees,
+                attendee_details_count: registrationData.attendee_details ? registrationData.attendee_details.length : 0,
+                organization_name: registrationData.organization_name,
+                contact_person: registrationData.contact_person,
+                contact_email: registrationData.contact_email,
+                contact_phone: registrationData.contact_phone,
+                attendee_details: registrationData.attendee_details
+            });
+            
+            // Verify Supabase connection before insert
+            if (!window.supabase) {
+                const errorMsg = 'Database connection not available. Please refresh the page and try again.';
+                console.error('❌ Supabase not available:', errorMsg);
+                showAlert(`❌ ${errorMsg}`, 'error');
+                showToastNotification(`❌ ${errorMsg}`, 'error');
+                return false;
+            }
+            
+            // Insert into Supabase (validation already done above)
+            console.log('💾 Inserting registration into Supabase...');
+            console.log('💾 Table: event_registrations');
+            console.log('💾 Registration data being inserted:', JSON.stringify(registrationData, null, 2));
+            
             const { data: insertedRegistration, error: insertError } = await window.supabase
                 .from('event_registrations')
                 .insert([registrationData])
                 .select();
             
             if (insertError) {
-                console.error('Error saving registration:', insertError);
-                showAlert(`Error saving registration: ${insertError.message || 'Please try again.'}`, 'error');
+                console.error('❌ ========== SUPABASE INSERT ERROR ==========');
+                console.error('❌ Error code:', insertError.code);
+                console.error('❌ Error message:', insertError.message);
+                console.error('❌ Error details:', insertError.details);
+                console.error('❌ Error hint:', insertError.hint);
+                console.error('❌ Full error object:', JSON.stringify(insertError, null, 2));
+                
+                // Show user-friendly error message based on error code
+                let userErrorMsg = 'Error saving registration. ';
+                if (insertError.code === '42501') {
+                    userErrorMsg += 'Permission denied. Please check database permissions (RLS policies).';
+                } else if (insertError.code === '23505') {
+                    userErrorMsg += 'This registration already exists.';
+                } else if (insertError.code === '23503') {
+                    userErrorMsg += 'Invalid event ID. Please refresh and try again.';
+                } else if (insertError.code === '23502') {
+                    userErrorMsg += 'Required field is missing. Please check the form and try again.';
+                } else if (insertError.code === 'PGRST116') {
+                    userErrorMsg += 'The requested resource was not found. Please refresh and try again.';
+                } else if (insertError.message) {
+                    userErrorMsg += insertError.message;
+                } else {
+                    userErrorMsg += 'Please try again or contact support.';
+                }
+                
+                showAlert(`❌ ${userErrorMsg}`, 'error');
+                showToastNotification(`❌ ${userErrorMsg}`, 'error');
                 return false;
             }
+            
+            if (!insertedRegistration || insertedRegistration.length === 0) {
+                console.error('❌ ========== NO DATA RETURNED FROM SUPABASE ==========');
+                console.error('❌ Insert response data:', insertedRegistration);
+                console.error('❌ Insert response error:', insertError);
+                showAlert('❌ Registration was not saved. No data returned from database.', 'error');
+                showToastNotification('❌ Registration was not saved. Please try again.', 'error');
+                return false;
+            }
+            
+            console.log('✅ ========== REGISTRATION SAVED SUCCESSFULLY ==========');
+            console.log('✅ Registration ID:', insertedRegistration[0]?.id);
+            console.log('✅ Registration type:', insertedRegistration[0]?.registration_type);
+            console.log('✅ Organization name:', insertedRegistration[0]?.organization_name);
+            console.log('✅ Contact person:', insertedRegistration[0]?.contact_person);
+            console.log('✅ Contact email:', insertedRegistration[0]?.contact_email);
+            console.log('✅ Contact phone:', insertedRegistration[0]?.contact_phone);
+            console.log('✅ Number of attendees:', insertedRegistration[0]?.number_of_attendees);
+            console.log('✅ Attendee details count:', insertedRegistration[0]?.attendee_details?.length || 0);
+            console.log('✅ Full registration data:', JSON.stringify(insertedRegistration[0], null, 2));
             
             // Dispatch event for admin panel
             window.dispatchEvent(new CustomEvent('event-registration-added', { detail: insertedRegistration[0] }));
             
+            console.log('✅ Returning true from saveRegistration');
             return true;
         } catch (error) {
             console.error('Error saving registration:', error);
@@ -822,15 +1146,183 @@
     
     function showAlert(message, type = 'success') {
         const alertDiv = document.getElementById('registration-alert');
-        if (!alertDiv) return;
+        if (!alertDiv) {
+            // Fallback: create a toast notification if alert div doesn't exist
+            showToastNotification(message, type);
+            return;
+        }
         
+        // Enhanced alert styling
         alertDiv.className = `alert alert-${type}`;
-        alertDiv.textContent = message;
+        alertDiv.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 0.75rem; padding: 1rem 1.5rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}" style="font-size: 1.5rem; color: ${type === 'success' ? '#10b981' : '#ef4444'};"></i>
+                <span style="flex: 1; font-weight: 500;">${message}</span>
+                <button onclick="this.parentElement.parentElement.style.display='none'" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 0.25rem; font-size: 1.25rem; line-height: 1;">&times;</button>
+            </div>
+        `;
         alertDiv.style.display = 'block';
+        alertDiv.style.marginBottom = '1rem';
         
+        // Scroll to alert
+        alertDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        
+        // Auto-hide after 5 seconds
         setTimeout(() => {
-            alertDiv.style.display = 'none';
+            if (alertDiv.style.display !== 'none') {
+                alertDiv.style.transition = 'opacity 0.3s ease';
+                alertDiv.style.opacity = '0';
+                setTimeout(() => {
+                    alertDiv.style.display = 'none';
+                    alertDiv.style.opacity = '1';
+                }, 300);
+            }
         }, 5000);
+    }
+    
+    // Toast notification for better visibility
+    function showToastNotification(message, type = 'success') {
+        const toast = document.createElement('div');
+        toast.id = 'registration-toast-notification';
+        toast.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${type === 'success' ? '#10b981' : '#ef4444'};
+            color: white;
+            padding: 1.25rem 1.75rem;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+            z-index: 10002;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            min-width: 320px;
+            max-width: 500px;
+            animation: slideInRight 0.4s ease;
+            font-size: 1rem;
+        `;
+        toast.innerHTML = `
+            <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}" style="font-size: 2rem;"></i>
+            <span style="flex: 1; font-weight: 600; line-height: 1.4;">${message}</span>
+            <button onclick="document.getElementById('registration-toast-notification')?.remove()" style="background: none; border: none; color: white; cursor: pointer; padding: 0.25rem; font-size: 1.5rem; line-height: 1; opacity: 0.9; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.9'">&times;</button>
+        `;
+        
+        document.body.appendChild(toast);
+        
+        // Auto-remove after 6 seconds
+        setTimeout(() => {
+            if (toast.parentElement) {
+                toast.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    if (toast.parentElement) toast.remove();
+                }, 400);
+            }
+        }, 6000);
+    }
+    
+    // Unified success notification handler
+    function showSuccessNotifications(orgName) {
+        console.log('🎉 showSuccessNotifications called for:', orgName);
+        
+        const successMessage = `✅ Registration submitted successfully! Your ${orgName || 'Organization'} registration has been saved. You will receive a confirmation email shortly.`;
+        
+        // Show all three notification types
+        try {
+            console.log('📢 1. Showing inline alert');
+            showAlert(successMessage, 'success');
+        } catch (e) {
+            console.error('❌ Error showing inline alert:', e);
+        }
+        
+        try {
+            console.log('📢 2. Showing toast notification');
+            showToastNotification('✅ Registration submitted successfully!', 'success');
+        } catch (e) {
+            console.error('❌ Error showing toast:', e);
+        }
+        
+        try {
+            console.log('📢 3. Showing success modal');
+            showSuccessModal(orgName);
+        } catch (e) {
+            console.error('❌ Error showing modal:', e);
+        }
+        
+        console.log('✅ All success notifications triggered');
+    }
+    
+    // Show a prominent success modal
+    function showSuccessModal(orgName) {
+        // Remove any existing success modal
+        const existingModal = document.getElementById('registration-success-modal');
+        if (existingModal) existingModal.remove();
+        
+        const modal = document.createElement('div');
+        modal.id = 'registration-success-modal';
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            z-index: 99999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.3s ease;
+        `;
+        
+        modal.innerHTML = `
+            <div style="background: white; border-radius: 16px; padding: 2.5rem; max-width: 500px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center; animation: slideUp 0.4s ease;">
+                <div style="margin-bottom: 1.5rem;">
+                    <div style="width: 80px; height: 80px; background: #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto;">
+                        <i class="fas fa-check" style="font-size: 2.5rem; color: white;"></i>
+                    </div>
+                </div>
+                <h2 style="font-size: 1.75rem; font-weight: 700; color: #1f2937; margin-bottom: 1rem;">Registration Successful!</h2>
+                <p style="font-size: 1.1rem; color: #6b7280; margin-bottom: 2rem; line-height: 1.6;">
+                    Your ${orgName || 'organization'} registration has been successfully submitted and saved.
+                </p>
+                <p style="font-size: 0.95rem; color: #9ca3af; margin-bottom: 2rem;">
+                    You will receive a confirmation email shortly.
+                </p>
+                <button onclick="document.getElementById('registration-success-modal')?.remove()" style="background: #10b981; color: white; border: none; padding: 0.875rem 2rem; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);" onmouseover="this.style.background='#059669'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(16, 185, 129, 0.4)'" onmouseout="this.style.background='#10b981'; this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(16, 185, 129, 0.3)'">
+                    Close
+                </button>
+            </div>
+        `;
+        
+        // Ensure modal is appended to body (not inside registration modal)
+        document.body.appendChild(modal);
+        
+        // Force modal to be visible by ensuring it's on top
+        setTimeout(() => {
+            modal.style.display = 'flex';
+            modal.style.zIndex = '99999';
+        }, 10);
+        
+        // Close on overlay click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.remove();
+            }
+        });
+        
+        // Auto-close after 4 seconds
+        setTimeout(() => {
+            if (modal.parentElement) {
+                modal.style.transition = 'opacity 0.3s ease';
+                modal.style.opacity = '0';
+                setTimeout(() => {
+                    if (modal.parentElement) modal.remove();
+                }, 300);
+            }
+        }, 4000);
     }
     
     // Initialize
@@ -879,8 +1371,12 @@
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 
+                console.log('📝 Form submission started');
+                
                 const formData = new FormData(form);
                 const data = Object.fromEntries(formData.entries());
+                
+                console.log('📋 Form data collected:', data);
                 
                 // Validate
                 if (!data.registrationType) {
@@ -894,39 +1390,110 @@
                 }
                 
                 if (data.registrationType === 'organization') {
-                    if (!data.organizationName) {
+                    if (!data.organizationName || data.organizationName.trim() === '') {
                         showAlert('Please enter organization name.', 'error');
                         return;
                     }
-                    if (!data.contactPerson) {
+                    if (!data.contactPerson || data.contactPerson.trim() === '') {
                         showAlert('Please enter contact person name.', 'error');
+                        return;
+                    }
+                    if (!data.numberOfAttendees || parseInt(data.numberOfAttendees) < 1) {
+                        showAlert('Please enter a valid number of attendees.', 'error');
                         return;
                     }
                 }
                 
                 if (!data.email || !data.phone) {
-                    showAlert('Please fill in all required fields.', 'error');
+                    showAlert('Please fill in all required fields (email and phone).', 'error');
                     return;
                 }
                 
-                // Save registration
-                if (await saveRegistration(data)) {
-                    showAlert('✅ Registration submitted successfully! You will receive a confirmation email shortly.', 'success');
+                // Disable submit button to prevent double submission
+                const submitButton = form.querySelector('button[type="submit"]');
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.textContent = 'Submitting...';
+                }
+                
+                try {
+                    console.log('🚀 ========== FORM SUBMISSION STARTED ==========');
+                    console.log('📋 Form data collected:', data);
+                    console.log('📋 Registration type:', data.registrationType);
+                    console.log('📋 Organization name:', data.organizationName);
+                    console.log('📋 Number of attendees:', data.numberOfAttendees);
                     
-                    setTimeout(() => {
+                    // Save registration
+                    console.log('💾 Calling saveRegistration function...');
+                    const success = await saveRegistration(data);
+                    
+                    console.log('📊 saveRegistration returned:', success);
+                    console.log('📊 Type of success:', typeof success);
+                    console.log('📊 Is success === true?', success === true);
+                    console.log('📊 Is success truthy?', !!success);
+                    
+                    if (success === true) {
+                        console.log('✅ ========== SUCCESS! Registration saved to Supabase ==========');
+                        console.log('✅ Showing success notifications...');
+                        
+                        // Use unified success notification handler
+                        const orgName = data.organizationName || 'Organization';
+                        console.log('✅ Organization name for notification:', orgName);
+                        
+                        // Close registration modal FIRST so success modal is visible
+                        console.log('🔄 Closing registration modal immediately to show success notification');
                         closeEventRegistration();
-                    }, 2000);
-                } else {
-                    // Error message already shown in saveRegistration
+                        
+                        // Small delay to ensure modal is closed, then show success notifications
+                        setTimeout(() => {
+                            // Call unified success handler
+                            showSuccessNotifications(orgName);
+                        }, 300);
+                    } else {
+                        console.error('❌ ========== REGISTRATION SAVE FAILED ==========');
+                        console.error('❌ saveRegistration returned:', success);
+                        console.error('❌ This means the save did not complete successfully');
+                        console.error('❌ Check the console above for validation or database errors');
+                        
+                        // Show a generic error if no specific error was shown
+                        if (submitButton) {
+                            submitButton.disabled = false;
+                            submitButton.textContent = 'Submit Registration';
+                        }
+                    }
+                } catch (error) {
+                    console.error('❌ ========== EXCEPTION IN FORM SUBMISSION ==========');
+                    console.error('❌ Error type:', error.constructor.name);
+                    console.error('❌ Error message:', error.message);
+                    console.error('❌ Error stack:', error.stack);
+                    console.error('❌ Full error:', error);
+                    
+                    showAlert(`❌ An error occurred: ${error.message || 'Please try again.'}`, 'error');
+                    showToastNotification(`❌ Error: ${error.message || 'Please try again.'}`, 'error');
+                    
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        submitButton.textContent = 'Submit Registration';
+                    }
                 }
             });
         }
     }
     
-    // Make functions globally accessible
+    // ✅ SAFETY: Ensure validateAttendeeDetails is NOT exposed globally
+    // It should only be called internally within this module
+    // This prevents any cached/broken versions from interfering
+    
+    // Make functions globally accessible (but NOT validateAttendeeDetails)
     window.openEventRegistration = openEventRegistration;
     window.closeEventRegistration = closeEventRegistration;
     window.addAttendeeRow = addAttendeeRow;
+    
+    // ✅ EXPLICIT: Expose buildAttendeesFromDOM for debugging (if needed)
+    // But keep validateAttendeeDetails private to prevent conflicts
+    if (typeof window.buildAttendeesFromDOM === 'undefined') {
+        window.buildAttendeesFromDOM = buildAttendeesFromDOM;
+    }
     window.removeAttendeeRow = removeAttendeeRow;
     window.downloadAttendeeTemplate = downloadAttendeeTemplate;
     window.handleExcelUpload = handleExcelUpload;

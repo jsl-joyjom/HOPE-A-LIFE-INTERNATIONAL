@@ -403,17 +403,22 @@
         async function getQuotesFromSupabase() {
             try {
                 if (!window.supabase) {
+                    console.warn('Supabase not available for loading quotes');
                     return [];
                 }
                 
-                // Only fetch published quotes
+                // Fetch all quotes (no status filter - works with or without status column)
                 const { data: quotes, error } = await window.supabase
                     .from('daily_quotes')
                     .select('*')
-                    .eq('status', 'published')
                     .order('date', { ascending: true, nullsFirst: true });
                 
-                if (error) throw error;
+                if (error) {
+                    console.error('Error fetching quotes:', error);
+                    throw error;
+                }
+                
+                console.log(`📖 Loaded ${quotes?.length || 0} quotes from Supabase`);
                 
                 return (quotes || []).map(q => ({
                     text: q.text,
@@ -429,17 +434,22 @@
         async function getVersesFromSupabase() {
             try {
                 if (!window.supabase) {
+                    console.warn('Supabase not available for loading verses');
                     return [];
                 }
                 
-                // Only fetch published verses
+                // Fetch all verses (no status filter - works with or without status column)
                 const { data: verses, error } = await window.supabase
                     .from('daily_verses')
                     .select('*')
-                    .eq('status', 'published')
                     .order('date', { ascending: true, nullsFirst: true });
                 
-                if (error) throw error;
+                if (error) {
+                    console.error('Error fetching verses:', error);
+                    throw error;
+                }
+                
+                console.log(`📖 Loaded ${verses?.length || 0} verses from Supabase`);
                 
                 return (verses || []).map(v => ({
                     text: v.text,
@@ -456,24 +466,31 @@
             // Always fetch fresh quotes to ensure we have the latest data
             // Cache is only used to avoid multiple simultaneous requests
             if (cachedQuotes.length === 0) {
+                console.log('📖 Cache empty, fetching quotes from Supabase...');
                 cachedQuotes = await getQuotesFromSupabase();
+                console.log(`📖 Cached ${cachedQuotes.length} quotes`);
             }
             
             const quotes = cachedQuotes;
             const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
             
+            console.log(`🔍 Looking for quote for today (${today}), total quotes: ${quotes.length}`);
+            
             // Find quote scheduled for today
             const todayQuote = quotes.find(q => q.date === today);
             if (todayQuote) {
+                console.log('✅ Found quote scheduled for today');
                 return todayQuote;
             }
             
             // Find quotes without dates (general quotes)
             const generalQuotes = quotes.filter(q => !q.date || q.date === '');
+            console.log(`📋 Found ${generalQuotes.length} general quotes (no date)`);
             
             // If no quotes, return null (don't show dev placeholder)
             // The frontend should handle empty state gracefully
             if (generalQuotes.length === 0 && quotes.length === 0) {
+                console.warn('⚠️ No quotes available in database');
                 return null;
             }
             
@@ -484,30 +501,39 @@
             const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
             const quoteIndex = dayOfYear % availableQuotes.length;
             
-            return availableQuotes[quoteIndex] || availableQuotes[0];
+            const selectedQuote = availableQuotes[quoteIndex] || availableQuotes[0];
+            console.log(`✅ Selected quote (index ${quoteIndex} of ${availableQuotes.length})`);
+            return selectedQuote;
         }
         
         async function getTodayVerse() {
             // Load verses if not cached
             if (cachedVerses.length === 0) {
+                console.log('📖 Cache empty, fetching verses from Supabase...');
                 cachedVerses = await getVersesFromSupabase();
+                console.log(`📖 Cached ${cachedVerses.length} verses`);
             }
             
             const verses = cachedVerses;
             const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
             
+            console.log(`🔍 Looking for verse for today (${today}), total verses: ${verses.length}`);
+            
             // Find verse scheduled for today
             const todayVerse = verses.find(v => v.date === today);
             if (todayVerse) {
+                console.log('✅ Found verse scheduled for today');
                 return todayVerse;
             }
             
             // Find verses without dates (general verses)
             const generalVerses = verses.filter(v => !v.date || v.date === '');
+            console.log(`📋 Found ${generalVerses.length} general verses (no date)`);
             
             // If no verses, return null (don't show dev placeholder)
             // The frontend should handle empty state gracefully
             if (generalVerses.length === 0 && verses.length === 0) {
+                console.warn('⚠️ No verses available in database');
                 return null;
             }
             
@@ -518,7 +544,9 @@
             const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
             const verseIndex = dayOfYear % availableVerses.length;
             
-            return availableVerses[verseIndex] || availableVerses[0];
+            const selectedVerse = availableVerses[verseIndex] || availableVerses[0];
+            console.log(`✅ Selected verse (index ${verseIndex} of ${availableVerses.length})`);
+            return selectedVerse;
         }
         
         let lastQuoteFetch = 0;
@@ -548,8 +576,10 @@
                 if (quote && quote.text) {
                     quoteTextEl.innerHTML = '<p>' + quote.text + '</p>';
                     quoteAuthorEl.textContent = quote.author ? '— ' + quote.author : '';
+                    console.log('✅ Quote displayed:', quote.text.substring(0, 50) + '...');
                 } else {
-                    quoteTextEl.innerHTML = '<p>' + (quote || '') + '</p>';
+                    console.warn('⚠️ No quote found or quote has no text');
+                    quoteTextEl.innerHTML = '<p style="color: var(--text-secondary); font-style: italic;">Loading quote of the day...</p>';
                     quoteAuthorEl.textContent = '';
                 }
                 
@@ -577,7 +607,9 @@
                 if (verse && verse.text) {
                     verseTextEl.innerHTML = '<p>' + verse.text + '</p>';
                     verseReferenceEl.textContent = verse.reference ? '— ' + verse.reference : '';
+                    console.log('✅ Verse displayed:', verse.text.substring(0, 50) + '...');
                 } else {
+                    console.warn('⚠️ No verse found or verse has no text');
                     // Show loading or empty state instead of dev placeholder
                     verseTextEl.innerHTML = '<p style="color: var(--text-secondary); font-style: italic;">Loading verse of the day...</p>';
                     verseReferenceEl.textContent = '';
